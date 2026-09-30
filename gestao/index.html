@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tinhas Gestão</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-mark">T</span><div><strong>Tinhas</strong><small>Gestão</small></div></div>
+      <nav class="menu">
+        <a class="active" href="#dashboard">⌂ <span>Início</span></a>
+        <a href="#clientes">♙ <span>Clientes</span></a>
+        <a href="#orcamentos">R$ <span>Orçamentos</span></a>
+        <a href="#producao">▦ <span>Produção</span></a>
+        <a href="#materiais">▧ <span>Materiais</span></a>
+        <a href="#financeiro">◫ <span>Financeiro</span></a>
+        <a href="#portfolio">▣ <span>Portfólio</span></a>
+        <a href="#marketing">✦ <span>Marketing</span></a>
+      </nav>
+      <div class="sidebar-foot">v1.0 • Base Tinhas</div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div><p class="eyebrow">PAINEL DA EMPRESA</p><h1>Olá, Fernando 👋</h1></div>
+        <a class="instagram" href="https://instagram.com/" target="_blank" rel="noopener">Instagram</a>
+      </header>
+
+      <section id="dashboard" class="content">
+        <div class="cards">
+          <article class="metric"><span>Orçamentos</span><strong>—</strong><small>dados reais entrarão aqui</small></article>
+          <article class="metric"><span>Em produção</span><strong>—</strong><small>dados reais entrarão aqui</small></article>
+          <article class="metric"><span>Pendências</span><strong>—</strong><small>dados reais entrarão aqui</small></article>
+          <article class="metric"><span>Clientes</span><strong id="clientCount">—</strong><small>carregado da API</small></article>
+        </div>
+
+        <section class="panel">
+          <div class="panel-head"><div><p class="eyebrow">PRIMEIRO TESTE DE INTEGRAÇÃO</p><h2>Clientes conectados ao Apps Script</h2></div><button id="reloadBtn" class="btn">Atualizar</button></div>
+          <div id="status" class="status">Conectando ao banco da Tinhas…</div>
+          <div class="table-wrap">
+            <table><thead><tr><th>ID</th><th>Nome</th><th>Instagram</th><th>Cidade</th><th>Status</th></tr></thead>
+            <tbody id="clientsBody"><tr><td colspan="5">Carregando…</td></tr></tbody></table>
+          </div>
+        </section>
+      </section>
+    </main>
+  </div>
+  <script>
+    window.TINHAS_API_URL = "{api_url}";
+  </script>
+  <script src="js/app.js"></script>
+</body>
+</html>
