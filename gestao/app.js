@@ -1,6 +1,6 @@
 'use strict';
 
-const TINHAS_VERSION = (window.TINHAS_CONFIG && window.TINHAS_CONFIG.APP_VERSION) || '1.0.0';
+const TINHAS_VERSION = (window.TINHAS_CONFIG && window.TINHAS_CONFIG.APP_VERSION) || '1.0.6';
 const STORAGE_TOKEN = 'tinhas_gestao_token';
 const STORAGE_USER = 'tinhas_gestao_usuario';
 const STATUS_PRODUCAO = ['Aguardando material', 'Em produção', 'Acabamento', 'Pronto', 'Entregue', 'Cancelado'];
@@ -97,7 +97,68 @@ function limparSessao() {
   sessao = {token:null, usuario:null};
 }
 
+let inicioAbertura = performance.now();
+
+function atualizarAbertura(valor, mensagem) {
+  const trilho = document.querySelector('.abertura-trilho');
+  const barra = $('abertura-progresso');
+  const status = $('abertura-status');
+  const percentual = Math.max(0, Math.min(100, Number(valor) || 0));
+  if (barra) barra.style.width = `${percentual}%`;
+  if (trilho) trilho.setAttribute('aria-valuenow', String(Math.round(percentual)));
+  if (status && mensagem) status.textContent = mensagem;
+}
+
+function pausa(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
+async function prepararAbertura() {
+  atualizarAbertura(8, 'Carregando...');
+  const imagem = $('imagem-abertura');
+  if (imagem) {
+    if (!imagem.complete) {
+      await Promise.race([
+        new Promise(resolve => {
+          imagem.addEventListener('load', resolve, {once:true});
+          imagem.addEventListener('error', resolve, {once:true});
+        }),
+        pausa(5000)
+      ]);
+    }
+    if (typeof imagem.decode === 'function') {
+      try { await imagem.decode(); } catch (_) {}
+    }
+  }
+  atualizarAbertura(34, 'Carregando...');
+  try { await Promise.race([document.fonts.ready, pausa(1200)]); } catch (_) {}
+  atualizarAbertura(55, 'Carregando...');
+}
+
+async function finalizarAbertura() {
+  atualizarAbertura(94, 'Carregando...');
+  const tempoDecorrido = performance.now() - inicioAbertura;
+  const tempoRestante = Math.max(0, 1450 - tempoDecorrido);
+  if (tempoRestante) await pausa(tempoRestante);
+  atualizarAbertura(100, 'Pronto!');
+  await pausa(220);
+  const abertura = $('tela-abertura');
+  if (abertura) {
+    abertura.classList.add('saindo');
+    await pausa(500);
+    abertura.classList.add('escondido');
+  }
+  const login = $('tela-login');
+  if (login) { login.inert = false; login.setAttribute('aria-hidden','false'); }
+}
+
 async function iniciarApp() {
+  inicioAbertura = performance.now();
+  if ('serviceWorker' in navigator) {
+    const registrarServiceWorker = () => navigator.serviceWorker.register('./service-worker.js')
+      .catch(err => console.warn('PWA Service Worker:', err));
+    if (document.readyState === 'complete') registrarServiceWorker();
+    else window.addEventListener('load', registrarServiceWorker, {once:true});
+  }
+  await prepararAbertura();
   $('form-login').addEventListener('submit', entrar);
   $('btn-logout').addEventListener('click', sair);
   $('btn-logout-modulo').addEventListener('click', sair);
@@ -112,9 +173,6 @@ async function iniciarApp() {
   document.querySelectorAll('.modulo').forEach(button => button.addEventListener('click', () => abrirModulo(button.dataset.modulo)));
   $('btn-instalar-home').addEventListener('click', instalarApp);
 
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => navigator.serviceWorker.register('./service-worker.js').catch(err => console.warn('PWA Service Worker:', err)));
-  }
   window.addEventListener('beforeinstallprompt', event => {
     event.preventDefault(); installPromptEvent = event; $('btn-instalar-home').classList.remove('escondido');
   });
@@ -122,17 +180,20 @@ async function iniciarApp() {
 
   if (sessao.token && sessao.usuario) {
     try {
+      atualizarAbertura(76, 'Carregando...');
       const result = await chamarApi({action:'usuarioAtual'});
       sessao.usuario = result.dados.usuario;
       localStorage.setItem(STORAGE_USER, JSON.stringify(sessao.usuario));
       abrirHome();
       carregarResumoHome();
+      await finalizarAbertura();
       return;
     } catch (error) {
       limparSessao();
     }
   }
   mostrarTela('tela-login');
+  await finalizarAbertura();
 }
 
 async function entrar(event) {

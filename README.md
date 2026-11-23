@@ -27,3 +27,6 @@ A aba `USUÁRIOS` da planilha continua determinando quem tem autorização. Cada
 O site público permanece na raiz. O PWA fica disponível em `/gestao/` quando o GitHub Pages estiver publicado a partir de `main` + `/(root)`.
 
 **Não publique o conteúdo da pasta `apps_script_privado` no GitHub.**
+
+
+Atualização do aplicativo: v1.0.6 — tela de abertura ilustrada com Salmos 37:5 antes do login.

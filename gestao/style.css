@@ -75,7 +75,7 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}button:disabled{
 html,body{overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch}#tela-modulo{position:relative;min-height:100dvh;overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-y:auto}#tela-modulo .topo{position:sticky;top:0;z-index:50}#tela-modulo .conteudo-modulo{height:auto;min-height:calc(100dvh - 66px);overflow:visible;padding-bottom:calc(90px + env(safe-area-inset-bottom))}
 
 
-/* LOGIN V1.0.4 — tela compacta, sem rolagem */
+/* LOGIN V1.0.6 — tela compacta, sem rolagem */
 #tela-login.tela-login{
   height:100dvh;
   min-height:100dvh;
@@ -201,4 +201,50 @@ html,body{overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch}#te
 @media(max-width:390px){
   #tela-login.tela-login{padding-left:17px;padding-right:17px}
   #tela-login .login-ilustracao{max-height:260px}
+}
+
+
+/* TELA DE ABERTURA — introdução antes do login */
+.tela-abertura{
+  position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;
+  overflow:hidden;background:#090401;opacity:1;visibility:visible;
+  transition:opacity .48s ease,visibility .48s ease;
+}
+.tela-abertura::before{
+  content:"";position:absolute;inset:-24px;background-image:url("assets/splash-tinhas.webp");
+  background-size:cover;background-position:center;filter:blur(22px) brightness(.42);
+  transform:scale(1.08);opacity:.72;
+}
+.abertura-poster{
+  position:relative;isolation:isolate;width:min(100vw,75dvh);height:min(100dvh,133.333vw);
+  aspect-ratio:3/4;overflow:hidden;background:#0b0502;
+  box-shadow:0 0 42px rgba(0,0,0,.38);
+}
+.abertura-poster>img{display:block;width:100%;height:100%;object-fit:fill}
+.abertura-carregamento{
+  position:absolute;left:25%;top:73.6%;width:50%;height:6.4%;display:flex;
+  flex-direction:column;align-items:center;justify-content:center;gap:7px;
+  padding:5px 7px;border-radius:13px;background:#090503;
+  box-shadow:0 4px 16px rgba(0,0,0,.35);
+}
+.abertura-trilho{
+  width:78%;height:9px;overflow:hidden;border:1px solid rgba(255,177,65,.78);
+  border-radius:999px;background:rgba(255,255,255,.15);
+  box-shadow:0 0 9px rgba(255,135,0,.24),inset 0 1px 3px rgba(0,0,0,.6);
+}
+.abertura-trilho span{
+  display:block;width:0;height:100%;border-radius:inherit;
+  background:linear-gradient(90deg,#f87900 0%,#ffb21a 55%,#ffdc72 100%);
+  box-shadow:0 0 10px rgba(255,145,0,.8);
+  transition:width .28s ease;
+}
+#abertura-status{color:#fff;font-size:clamp(10px,2.7vw,14px);line-height:1.1;
+  font-weight:600;text-align:center;text-shadow:0 1px 4px #000}
+.tela-abertura.saindo{opacity:0;visibility:hidden;pointer-events:none}
+@media(max-width:420px){
+  .abertura-carregamento{gap:5px;padding:4px 6px}
+  .abertura-trilho{height:7px}
+}
+@media(prefers-reduced-motion:reduce){
+  .tela-abertura,.abertura-trilho span{transition:none}
 }

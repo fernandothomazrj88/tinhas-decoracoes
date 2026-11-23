@@ -9,13 +9,26 @@
   <meta name="apple-mobile-web-app-title" content="Tinhas Gestão">
   <meta name="description" content="Aplicativo interno de gestão da Tinhas Decorações.">
   <title>Tinhas Gestão</title>
-  <link rel="manifest" href="manifest.json?v=1.0.4">
+  <link rel="manifest" href="manifest.json?v=1.0.6">
   <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
   <link rel="apple-touch-icon" href="assets/icon-192.png">
-  <link rel="stylesheet" href="style.css?v=1.0.5">
+  <link rel="preload" as="image" href="assets/splash-tinhas.webp" fetchpriority="high">
+  <link rel="stylesheet" href="style.css?v=1.0.6">
 </head>
 <body>
-  <section id="tela-login" class="tela tela-login">
+  <section id="tela-abertura" class="tela-abertura" aria-label="Abertura do Tinhas Gestão">
+    <div class="abertura-poster">
+      <img id="imagem-abertura" src="assets/splash-tinhas.webp" alt="" fetchpriority="high">
+      <div class="abertura-carregamento" aria-live="polite">
+        <div class="abertura-trilho" role="progressbar" aria-label="Carregamento do aplicativo" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <span id="abertura-progresso"></span>
+        </div>
+        <p id="abertura-status">Carregando...</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="tela-login" class="tela tela-login" inert aria-hidden="true">
     <div class="login-box">
       <div class="logo-login"><img src="assets/icone-tinhas.png" alt="Símbolo Tinhas Decorações"></div>
       <div class="marca-login"><h1>Gestão</h1></div>
@@ -28,7 +41,7 @@
         <button id="btn-login" class="botao-principal" type="submit">Entrar</button>
         <p id="mensagem-login" class="mensagem" role="status"></p>
       </form>
-      <p class="rodape-login">Tinhas Decorações LTDA <span>•</span> v.1.0.5</p>
+      <p class="rodape-login">Tinhas Decorações LTDA <span>•</span> v.1.0.6</p>
     </div>
   </section>
 
@@ -95,7 +108,7 @@
 
   <div id="modal-root"></div>
   <div id="toast" class="toast escondido" role="status"></div>
-  <script src="config.js?v=1.0.0"></script>
-  <script src="app.js?v=1.0.0"></script>
+  <script src="config.js?v=1.0.6"></script>
+  <script src="app.js?v=1.0.6"></script>
 </body>
 </html>
