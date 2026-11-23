@@ -2,55 +2,101 @@
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#ED7014">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Tinhas Gestão">
+  <meta name="description" content="Aplicativo interno de gestão da Tinhas Decorações.">
   <title>Tinhas Gestão</title>
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="manifest" href="manifest.json?v=1.0.1">
+  <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
+  <link rel="apple-touch-icon" href="assets/icon-192.png">
+  <link rel="stylesheet" href="style.css?v=1.0.1">
 </head>
 <body>
-  <div class="app-shell">
-    <aside class="sidebar">
-      <div class="brand"><span class="brand-mark">T</span><div><strong>Tinhas</strong><small>Gestão</small></div></div>
-      <nav class="menu">
-        <a class="active" href="#dashboard">⌂ <span>Início</span></a>
-        <a href="#clientes">♙ <span>Clientes</span></a>
-        <a href="#orcamentos">R$ <span>Orçamentos</span></a>
-        <a href="#producao">▦ <span>Produção</span></a>
-        <a href="#materiais">▧ <span>Materiais</span></a>
-        <a href="#financeiro">◫ <span>Financeiro</span></a>
-        <a href="#portfolio">▣ <span>Portfólio</span></a>
-        <a href="#marketing">✦ <span>Marketing</span></a>
-      </nav>
-      <div class="sidebar-foot">v1.0 • Base Tinhas</div>
-    </aside>
+  <section id="tela-login" class="tela tela-login">
+    <div class="login-box">
+      <div class="logo-login"><img src="assets/logo-tinhas.png" alt="Tinhas Decorações"></div>
+      <div class="marca-login"><h1>GESTÃO</h1><p>CONTROLE DA MARCENARIA</p></div>
+      <div class="login-ilustracao">
+        <img src="assets/casal-login.png" alt="Equipe Tinhas Decorações: marcenaria e marketing">
+        <div class="login-frase">Organização hoje,<br><strong>crescimento sempre</strong> 🧡</div>
+      </div>
+      <form id="form-login" class="form-login" autocomplete="on">
+        <label class="campo-login"><span>✉️</span><input id="email" type="email" placeholder="E-mail autorizado" autocomplete="username" required></label>
+        <label class="campo-login"><span>🔒</span><input id="senha" type="password" placeholder="Senha do aplicativo" autocomplete="current-password" required></label>
+        <button id="btn-login" class="botao-principal" type="submit">Entrar</button>
+        <p id="mensagem-login" class="mensagem" role="status"></p>
+      </form>
+      <p class="rodape-login">Acesso restrito à equipe autorizada da Tinhas.</p>
+    </div>
+  </section>
 
-    <main class="main">
-      <header class="topbar">
-        <div><p class="eyebrow">PAINEL DA EMPRESA</p><h1>Olá, Fernando 👋</h1></div>
-        <a class="instagram" href="https://instagram.com/" target="_blank" rel="noopener">Instagram</a>
-      </header>
-
-      <section id="dashboard" class="content">
-        <div class="cards">
-          <article class="metric"><span>Orçamentos</span><strong>—</strong><small>dados reais entrarão aqui</small></article>
-          <article class="metric"><span>Em produção</span><strong>—</strong><small>dados reais entrarão aqui</small></article>
-          <article class="metric"><span>Pendências</span><strong>—</strong><small>dados reais entrarão aqui</small></article>
-          <article class="metric"><span>Clientes</span><strong id="clientCount">—</strong><small>carregado da API</small></article>
-        </div>
-
-        <section class="panel">
-          <div class="panel-head"><div><p class="eyebrow">PRIMEIRO TESTE DE INTEGRAÇÃO</p><h2>Clientes conectados ao Apps Script</h2></div><button id="reloadBtn" class="btn">Atualizar</button></div>
-          <div id="status" class="status">Conectando ao banco da Tinhas…</div>
-          <div class="table-wrap">
-            <table><thead><tr><th>ID</th><th>Nome</th><th>Instagram</th><th>Cidade</th><th>Status</th></tr></thead>
-            <tbody id="clientsBody"><tr><td colspan="5">Carregando…</td></tr></tbody></table>
-          </div>
-        </section>
+  <section id="tela-home" class="tela escondido">
+    <header class="topo">
+      <button class="icone-topo" id="btn-menu" aria-label="Abrir menu">☰</button>
+      <div class="titulo-topo"><strong>TINHAS <span>GESTÃO</span></strong><small>DECORAÇÕES • MARCENARIA</small></div>
+      <button class="icone-topo" id="btn-logout" title="Sair" aria-label="Sair">↪</button>
+    </header>
+    <main class="conteudo-home">
+      <section class="hero hero-personalizado" id="hero-home">
+        <img id="hero-usuario" src="assets/casal-login.png" alt="Equipe Tinhas">
+        <div class="hero-frase" id="hero-frase">Projetos bem feitos,<br><strong>gestão em dia</strong> 🧡</div>
       </section>
+      <section class="saudacao"><p>Olá, <strong id="nome-usuario">Equipe Tinhas</strong> 👋</p><small>Vamos organizar o trabalho de hoje?</small></section>
+      <section class="resumo-home" id="resumo-home">
+        <div class="resumo-home-card"><small>Clientes</small><strong id="resumo-clientes">—</strong></div>
+        <div class="resumo-home-card"><small>Orçamentos</small><strong id="resumo-orcamentos">—</strong></div>
+        <div class="resumo-home-card"><small>Em produção</small><strong id="resumo-producao">—</strong></div>
+      </section>
+      <section class="titulo-secao-home"><span>ÁREA DE TRABALHO</span><strong>O que vamos gerenciar?</strong></section>
+      <section class="grid-modulos">
+        <button class="modulo" data-modulo="clientes"><div class="emoji">👥</div><strong>Clientes</strong><span>Cadastro e relacionamento</span></button>
+        <button class="modulo" data-modulo="orcamentos"><div class="emoji">📄</div><strong>Orçamentos</strong><span>Projetos, valores e aprovações</span></button>
+        <button class="modulo" data-modulo="producao"><div class="emoji">🪚</div><strong>Produção</strong><span>Pedidos e andamento</span></button>
+        <button class="modulo" data-modulo="materiais"><div class="emoji">🪵</div><strong>Materiais</strong><span>Madeira, ferragens e insumos</span></button>
+        <button class="modulo" data-modulo="estoque"><div class="emoji">📦</div><strong>Estoque</strong><span>Entradas e disponibilidade</span></button>
+        <button class="modulo" data-modulo="financeiro"><div class="emoji">💰</div><strong>Financeiro</strong><span>Receitas, despesas e caixa</span></button>
+        <button class="modulo" data-modulo="agenda"><div class="emoji">📅</div><strong>Agenda</strong><span>Prazos e entregas</span></button>
+        <button class="modulo" data-modulo="portfolio"><div class="emoji">🖼️</div><strong>Portfólio</strong><span>Projetos e fotos</span></button>
+        <button class="modulo" data-modulo="marketing"><div class="emoji">📣</div><strong>Marketing</strong><span>Conteúdo e divulgação</span></button>
+        <button class="modulo" data-modulo="relatorios"><div class="emoji">📊</div><strong>Relatórios</strong><span>Visão geral da empresa</span></button>
+        <button class="modulo" data-modulo="configuracoes"><div class="emoji">⚙️</div><strong>Configurações</strong><span>Equipe e preferências</span></button>
+      </section>
+      <section class="rodape-home"><img src="assets/logo-tinhas.png" alt="Tinhas Decorações"><span>Transformando ambientes com peças artesanais em madeira.</span></section>
+      <button id="btn-instalar-home" class="botao-instalar escondido" type="button">＋ Instalar Tinhas Gestão</button>
     </main>
+  </section>
+
+  <section id="tela-modulo" class="tela escondido">
+    <header class="topo topo-modulo">
+      <button class="icone-topo" id="btn-voltar" aria-label="Voltar">←</button>
+      <div class="titulo-topo"><strong>TINHAS <span>GESTÃO</span></strong><small id="subtitulo-modulo">ÁREA DE TRABALHO</small></div>
+      <button class="icone-topo" id="btn-logout-modulo" title="Sair" aria-label="Sair">↪</button>
+    </header>
+    <main id="modulo-conteudo" class="conteudo-modulo"></main>
+  </section>
+
+  <div id="drawer-backdrop" class="drawer-backdrop escondido">
+    <aside class="drawer" aria-label="Menu de navegação">
+      <div class="drawer-head"><img src="assets/logo-tinhas.png" alt="Tinhas"><button id="btn-fechar-menu" aria-label="Fechar">×</button></div>
+      <button data-drawer="inicio">🏠 Início</button>
+      <button data-drawer="clientes">👥 Clientes</button>
+      <button data-drawer="orcamentos">📄 Orçamentos</button>
+      <button data-drawer="producao">🪚 Produção</button>
+      <button data-drawer="materiais">🪵 Materiais</button>
+      <button data-drawer="estoque">📦 Estoque</button>
+      <button data-drawer="financeiro">💰 Financeiro</button>
+      <button data-drawer="agenda">📅 Agenda</button>
+      <button data-drawer="portfolio">🖼️ Portfólio</button>
+      <button data-drawer="marketing">📣 Marketing</button>
+    </aside>
   </div>
-  <script>
-    window.TINHAS_API_URL = "{api_url}";
-  </script>
-  <script src="js/app.js"></script>
+
+  <div id="modal-root"></div>
+  <div id="toast" class="toast escondido" role="status"></div>
+  <script src="config.js?v=1.0.0"></script>
+  <script src="app.js?v=1.0.0"></script>
 </body>
 </html>
