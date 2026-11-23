@@ -14,7 +14,7 @@ O aplicativo em `gestao/` é uma PWA estática para GitHub Pages. Ele utiliza:
 - `assets/`: logo e personagens oficiais da Tinhas;
 - `config.js`: endereço da API própria do Apps Script.
 
-A configuração `API_URL` em `gestao/config.js` já está preenchida com a URL `/exec` fornecida para a implantação do Apps Script. A versão do PWA foi atualizada para `1.0.1` para renovar o cache nos dispositivos.
+A configuração `API_URL` em `gestao/config.js` já está preenchida com a URL `/exec` fornecida para a implantação do Apps Script. A versão do PWA foi atualizada para `1.0.2` para renovar o cache nos dispositivos.
 
 ## Backend privado
 

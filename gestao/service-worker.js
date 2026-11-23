@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tinhas-gestao-v1.0.1';
+const CACHE_NAME = 'tinhas-gestao-v1.0.2';
 const APP_FILES = [
   './',
   './index.html',
@@ -7,6 +7,7 @@ const APP_FILES = [
   './app.js',
   './manifest.json',
   './assets/logo-tinhas.png',
+  './assets/icone-tinhas.png',
   './assets/casal-login.png',
   './assets/fernando-home.png',
   './assets/leticia-home.png',
