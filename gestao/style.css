@@ -99,9 +99,9 @@ html,body{overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch}#te
   overflow:hidden;
 }
 #tela-login .logo-login{
-  flex:0 0 125px;
+  flex:0 0 135px;
   width:100%;
-  height:125px;
+  height:135px;
   margin:0;
   padding:0;
   display:flex;
@@ -114,10 +114,10 @@ html,body{overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch}#te
 }
 #tela-login .logo-login img{
   display:block;
-  flex:0 0 90px;
-  width:90px;
-  height:90px;
-  max-width:90px;
+  flex:0 0 120px;
+  width:120px;
+  height:120px;
+  max-width:120px;
   object-fit:contain;
   border-radius:50%;
   box-shadow:0 0 0 1px rgba(0,0,0,.16);
@@ -177,8 +177,8 @@ html,body{overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch}#te
 #tela-login .rodape-login span{padding:0 3px}
 @media(max-height:700px){
   #tela-login.tela-login{padding-bottom:3px}
-  #tela-login .logo-login{flex-basis:125px;height:125px}
-  #tela-login .logo-login img{flex-basis:90px;width:90px;height:90px;max-width:90px}
+  #tela-login .logo-login{flex-basis:135px;height:135px}
+  #tela-login .logo-login img{flex-basis:120px;width:120px;height:120px;max-width:120px}
   #tela-login .marca-login h1{font-size:28px}
   #tela-login .login-ilustracao{max-height:290px;min-height:135px;margin:7px 0 6px}
   #tela-login .campo-login{height:42px;min-height:42px}
@@ -187,8 +187,8 @@ html,body{overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch}#te
   #tela-login .rodape-login{margin-top:5px;font-size:10.5px}
 }
 @media(max-height:610px){
-  #tela-login .logo-login{flex-basis:78px;height:78px}
-  #tela-login .logo-login img{flex-basis:72px;width:72px;height:72px;max-width:72px}
+  #tela-login .logo-login{flex-basis:100px;height:100px}
+  #tela-login .logo-login img{flex-basis:88px;width:88px;height:88px;max-width:88px}
   #tela-login .marca-login h1{font-size:25px}
   #tela-login .marca-login p{font-size:11px;margin-top:3px}
   #tela-login .login-ilustracao{min-height:115px;max-height:190px;margin:5px 0}
