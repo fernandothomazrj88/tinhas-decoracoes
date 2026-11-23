@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tinhas-gestao-v1.0.9';
+const CACHE_NAME = 'tinhas-gestao-v1.0.10';
 const APP_FILES = [
   './',
   './index.html',
