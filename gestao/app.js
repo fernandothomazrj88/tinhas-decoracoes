@@ -1,6 +1,6 @@
 'use strict';
 
-const TINHAS_VERSION = (window.TINHAS_CONFIG && window.TINHAS_CONFIG.APP_VERSION) || '1.0.6';
+const TINHAS_VERSION = (window.TINHAS_CONFIG && window.TINHAS_CONFIG.APP_VERSION) || '1.0.9';
 const STORAGE_TOKEN = 'tinhas_gestao_token';
 const STORAGE_USER = 'tinhas_gestao_usuario';
 const STATUS_PRODUCAO = ['Aguardando material', 'Em produção', 'Acabamento', 'Pronto', 'Entregue', 'Cancelado'];
@@ -160,6 +160,7 @@ async function iniciarApp() {
   }
   await prepararAbertura();
   $('form-login').addEventListener('submit', entrar);
+  $('btn-primeiro-acesso').addEventListener('click', abrirPrimeiroAcesso);
   $('btn-logout').addEventListener('click', sair);
   $('btn-logout-modulo').addEventListener('click', sair);
   $('btn-voltar').addEventListener('click', voltarInicio);
@@ -214,6 +215,52 @@ async function entrar(event) {
     mensagem.textContent = error.message;
   } finally {
     botao.disabled = false; botao.textContent = 'Entrar';
+  }
+}
+
+function abrirPrimeiroAcesso() {
+  const emailAtual = $('email').value.trim().toLowerCase();
+  abrirModal('Primeiro acesso', `
+    <form id="form-primeiro-acesso" class="formulario">
+      <p style="font-size:13px;line-height:1.45;margin-bottom:12px;color:#51443A">Informe seu e-mail autorizado e o código individual de primeiro acesso. Depois, crie sua senha particular.</p>
+      <div class="form-grid">
+        <div class="form-grupo full"><label for="primeiro-email">E-mail cadastrado</label><input class="campo-form" id="primeiro-email" type="email" autocomplete="username" required></div>
+        <div class="form-grupo full"><label for="primeiro-codigo">Código de primeiro acesso</label><input class="campo-form" id="primeiro-codigo" type="text" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" required></div>
+        <div class="form-grupo full"><label for="primeiro-senha">Nova senha (mínimo de 8 caracteres)</label><input class="campo-form" id="primeiro-senha" type="password" minlength="8" maxlength="128" autocomplete="new-password" required></div>
+        <div class="form-grupo full"><label for="primeiro-confirmacao">Confirme a nova senha</label><input class="campo-form" id="primeiro-confirmacao" type="password" minlength="8" maxlength="128" autocomplete="new-password" required></div>
+      </div>
+      <p id="mensagem-primeiro-acesso" class="status error" style="display:none;margin-top:12px" role="alert"></p>
+      <div class="form-acoes"><button type="button" class="botao-acao" data-fechar-modal>Cancelar</button><button type="submit" id="btn-salvar-primeiro-acesso" class="botao-acao destaque">Criar minha senha</button></div>
+    </form>`);
+  $('primeiro-email').value = emailAtual;
+  $('modal-root').querySelector('[data-fechar-modal]').addEventListener('click', fecharModal);
+  $('form-primeiro-acesso').addEventListener('submit', salvarPrimeiroAcesso);
+}
+
+async function salvarPrimeiroAcesso(event) {
+  event.preventDefault();
+  const email = $('primeiro-email').value.trim().toLowerCase();
+  const codigo = $('primeiro-codigo').value.trim().toUpperCase();
+  const senha = $('primeiro-senha').value;
+  const confirmacao = $('primeiro-confirmacao').value;
+  const botao = $('btn-salvar-primeiro-acesso');
+  const mensagem = $('mensagem-primeiro-acesso');
+  mensagem.style.display = 'none';
+  if (senha.length < 8) { mensagem.textContent = 'Use pelo menos 8 caracteres.'; mensagem.style.display = 'block'; return; }
+  if (senha !== confirmacao) { mensagem.textContent = 'As senhas não conferem.'; mensagem.style.display = 'block'; return; }
+  botao.disabled = true; botao.textContent = 'Criando senha...';
+  try {
+    await chamarApi({action:'configurarSenhaInicial', email, codigo, senha, confirmacao}, false);
+    fecharModal();
+    $('email').value = email;
+    $('senha').value = '';
+    $('mensagem-login').textContent = 'Senha criada! Entre com seu e-mail e a senha que acabou de cadastrar.';
+    $('senha').focus();
+    toast('Senha criada com sucesso!');
+  } catch (error) {
+    mensagem.textContent = error.message || 'Não foi possível criar sua senha.';
+    mensagem.style.display = 'block';
+    botao.disabled = false; botao.textContent = 'Criar minha senha';
   }
 }
 

@@ -248,3 +248,9 @@ html,body{overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch}#te
 @media(prefers-reduced-motion:reduce){
   .tela-abertura,.abertura-trilho span{transition:none}
 }
+
+
+/* Primeiro acesso — cadastro de senha dentro do aplicativo */
+.link-primeiro-acesso{display:block;align-self:center;margin:5px auto 0;padding:4px 8px;border:0;background:transparent;color:#301809;font-size:11px;line-height:1.2;text-align:center;text-decoration:none;cursor:pointer}
+.link-primeiro-acesso strong{font-weight:900;text-decoration:underline}
+.link-primeiro-acesso:focus-visible{outline:2px solid #111;outline-offset:2px;border-radius:6px}
