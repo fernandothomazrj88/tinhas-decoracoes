@@ -356,3 +356,64 @@ html,body{overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch}#te
   #tela-login .logo-login{flex-basis:158px;height:158px}
   #tela-login .logo-login img{max-height:158px}
 }
+
+
+/* V1.1.1 — abertura em tela cheia no celular, sem faixas vazias */
+#tela-abertura {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: stretch;
+  justify-content: stretch;
+  background: #090401;
+}
+#tela-abertura::before {
+  display: none;
+  content: none;
+}
+#tela-abertura .abertura-poster {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  aspect-ratio: auto;
+  display: block;
+  overflow: hidden;
+  background: #090401;
+  box-shadow: none;
+}
+#tela-abertura .abertura-arte {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  max-width: none;
+  max-height: none;
+  aspect-ratio: auto;
+  flex: none;
+  overflow: hidden;
+  background: #090401;
+  box-shadow: none;
+}
+#tela-abertura .abertura-arte > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center center;
+}
+#tela-abertura .abertura-arte .abertura-carregamento {
+  top: 73.6%;
+  left: 25%;
+  width: 50%;
+  height: 6.4%;
+}
