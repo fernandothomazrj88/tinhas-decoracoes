@@ -1,6 +1,6 @@
 'use strict';
 
-const TINHAS_VERSION = (window.TINHAS_CONFIG && window.TINHAS_CONFIG.APP_VERSION) || '1.0.9';
+const TINHAS_VERSION = (window.TINHAS_CONFIG && window.TINHAS_CONFIG.APP_VERSION) || '1.1.0';
 const STORAGE_TOKEN = 'tinhas_gestao_token';
 const STORAGE_USER = 'tinhas_gestao_usuario';
 const STATUS_PRODUCAO = ['Aguardando material', 'Em produção', 'Acabamento', 'Pronto', 'Entregue', 'Cancelado'];
@@ -98,12 +98,14 @@ function limparSessao() {
 }
 
 let inicioAbertura = performance.now();
+let percentualAberturaAtual = 0;
 
 function atualizarAbertura(valor, mensagem) {
   const trilho = document.querySelector('.abertura-trilho');
   const barra = $('abertura-progresso');
   const status = $('abertura-status');
   const percentual = Math.max(0, Math.min(100, Number(valor) || 0));
+  percentualAberturaAtual = percentual;
   if (barra) barra.style.width = `${percentual}%`;
   if (trilho) trilho.setAttribute('aria-valuenow', String(Math.round(percentual)));
   if (status && mensagem) status.textContent = mensagem;
@@ -133,13 +135,31 @@ async function prepararAbertura() {
   atualizarAbertura(55, 'Carregando...');
 }
 
+async function animarProgressoAbertura(destino, duracao) {
+  if (duracao <= 0) return;
+  const inicio = performance.now();
+  const valorInicial = percentualAberturaAtual;
+  await new Promise(resolve => {
+    const quadro = agora => {
+      const fracao = Math.min(1, (agora - inicio) / duracao);
+      const suave = fracao * (2 - fracao);
+      atualizarAbertura(valorInicial + (destino - valorInicial) * suave, 'Preparando seu espaço...');
+      if (fracao < 1) requestAnimationFrame(quadro);
+      else resolve();
+    };
+    requestAnimationFrame(quadro);
+  });
+}
+
 async function finalizarAbertura() {
-  atualizarAbertura(94, 'Carregando...');
+  // Mantém a identidade visual da abertura por pelo menos 4,5 segundos.
+  // Se a preparação/API demorar mais, a tela permanece até tudo estar pronto.
+  const tempoMinimo = 4500;
   const tempoDecorrido = performance.now() - inicioAbertura;
-  const tempoRestante = Math.max(0, 1450 - tempoDecorrido);
-  if (tempoRestante) await pausa(tempoRestante);
+  const tempoRestante = Math.max(0, tempoMinimo - tempoDecorrido);
+  if (tempoRestante) await animarProgressoAbertura(97, tempoRestante);
   atualizarAbertura(100, 'Pronto!');
-  await pausa(220);
+  await pausa(320);
   const abertura = $('tela-abertura');
   if (abertura) {
     abertura.classList.add('saindo');
@@ -186,7 +206,7 @@ async function iniciarApp() {
       sessao.usuario = result.dados.usuario;
       localStorage.setItem(STORAGE_USER, JSON.stringify(sessao.usuario));
       abrirHome();
-      carregarResumoHome();
+      await carregarResumoHome();
       await finalizarAbertura();
       return;
     } catch (error) {

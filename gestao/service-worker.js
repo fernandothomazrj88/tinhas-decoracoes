@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tinhas-gestao-v1.0.10';
+const CACHE_NAME = 'tinhas-gestao-v1.1.0';
 const APP_FILES = [
   './',
   './index.html',
@@ -13,7 +13,8 @@ const APP_FILES = [
   './assets/leticia-home.png',
   './assets/icon-192.png',
   './assets/icon-512.png',
-  './assets/splash-tinhas.webp'
+  './assets/splash-tinhas.webp',
+  './assets/logo-login-tinhas.png'
 ];
 
 self.addEventListener('install', event => {
