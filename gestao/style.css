@@ -358,7 +358,7 @@ html,body{overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch}#te
 }
 
 
-/* V1.1.1 — abertura em tela cheia no celular, sem faixas vazias */
+/* V1.1.2 — abertura em tela cheia com uma única barra dinâmica */
 #tela-abertura {
   position: fixed;
   inset: 0;
