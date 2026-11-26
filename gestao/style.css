@@ -494,3 +494,22 @@ body { max-width:520px; margin:0 auto; }
 .emoji .icone-vetor{width:27px;height:27px;display:block;fill:none;stroke:currentColor;stroke-width:1.65;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
 .cabecalho-modulo .icone-vetor-modulo{width:29px;height:29px;display:block;fill:none;stroke:var(--laranja);stroke-width:1.65;stroke-linecap:round;stroke-linejoin:round}
 .drawer>button .icone-drawer{width:19px;height:19px;display:inline-block;vertical-align:-4px;margin-right:8px;color:var(--laranja);fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+
+
+/* ESTOQUE — indicadores, abas e saldo */
+.estoque-resumo{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:0 0 12px}
+.estoque-kpi{min-width:0;padding:10px 9px;border:1px solid #111;border-radius:12px;background:#fff;color:#111;box-shadow:0 3px 9px rgba(0,0,0,.08)}
+.estoque-kpi small{display:block;font-size:10px;color:#63452f;line-height:1.2}
+.estoque-kpi strong{display:block;margin-top:4px;font-size:17px;line-height:1.1;overflow-wrap:anywhere}
+.estoque-kpi:last-child strong{font-size:13px}
+.estoque-acoes .botao-acao{flex:1}
+.estoque-abas{display:flex;gap:6px;margin:0 0 11px;padding:4px;border-radius:12px;background:#111}
+.estoque-aba{flex:1;border:0;border-radius:9px;padding:9px 7px;background:transparent;color:#fff;font-size:12px;font-weight:800}
+.estoque-aba.ativa{background:#ED7014;color:#111;box-shadow:0 2px 7px rgba(0,0,0,.2)}
+.estoque-registro .estoque-saldo{min-width:76px;text-align:right;color:#fff}
+.estoque-registro .estoque-saldo strong{display:block;font-size:23px;line-height:1.05}
+.estoque-registro .estoque-saldo small{display:block;color:#d6d6d6;font-size:10px;margin-top:2px}
+.estoque-registro .estoque-saldo.baixo{color:#ffbd70}
+.estoque-aviso{margin-top:13px}
+.badge-status.entrada{background:#CBEBD1;color:#135D27}.badge-status.saida{background:#FFD4D1;color:#8A1C18}.badge-status.ajuste{background:#FFE0B9;color:#754000}
+@media(max-width:360px){.estoque-kpi{padding:8px 6px}.estoque-kpi small{font-size:9px}.estoque-kpi strong{font-size:15px}.estoque-registro .estoque-saldo{min-width:62px}.estoque-registro .estoque-saldo strong{font-size:19px}}

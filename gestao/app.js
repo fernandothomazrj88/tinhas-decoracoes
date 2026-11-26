@@ -1,6 +1,6 @@
 'use strict';
 
-const TINHAS_VERSION = (window.TINHAS_CONFIG && window.TINHAS_CONFIG.APP_VERSION) || '1.3.0';
+const TINHAS_VERSION = (window.TINHAS_CONFIG && window.TINHAS_CONFIG.APP_VERSION) || '1.4.0';
 const STORAGE_TOKEN = 'tinhas_gestao_token';
 const STORAGE_USER = 'tinhas_gestao_usuario';
 const STATUS_PRODUCAO = ['Aguardando material', 'Em produção', 'Acabamento', 'Pronto', 'Entregue', 'Cancelado'];
@@ -329,6 +329,7 @@ async function abrirModulo(nome) {
     else if (nome === 'orcamentos') await renderOrcamentos(area);
     else if (nome === 'producao') await renderProducao(area);
     else if (nome === 'materiais') await renderMateriais(area);
+    else if (nome === 'estoque') await renderEstoque(area);
     else if (nome === 'configuracoes') await renderConfiguracoes(area);
     else renderModuloEmPreparacao(area, nome);
   } catch (error) {
@@ -575,6 +576,178 @@ async function alterarStatusMaterialTela(id) {
     const result = await chamarApi({action:'atualizarMaterial',id_material:id,material:dados});
     toast(result.dados?.mensagem || 'Situação atualizada.'); await atualizarListaMateriais();
   } catch (error) { toast(error.message || 'Não foi possível atualizar a situação.'); }
+}
+
+
+
+/* =====================================================
+   ESTOQUE — ENTRADAS, SAÍDAS E DISPONIBILIDADE
+===================================================== */
+let pedidosEstoqueCache = [];
+let movimentosEstoqueCache = [];
+let abaEstoqueAtual = 'saldo';
+
+async function renderEstoque(area) {
+  area.innerHTML = cabecalhoModulo(MODULOS.estoque) + `
+    <div class="estoque-resumo" id="resumo-estoque">
+      <div class="estoque-kpi"><small>Materiais ativos</small><strong id="estoque-kpi-ativos">—</strong></div>
+      <div class="estoque-kpi"><small>Estoque baixo</small><strong id="estoque-kpi-baixo">—</strong></div>
+      <div class="estoque-kpi"><small>Valor estimado</small><strong id="estoque-kpi-valor">—</strong></div>
+    </div>
+    <div class="barra-acoes estoque-acoes">
+      <button id="btn-nova-movimentacao" class="botao-acao destaque">＋ Nova movimentação</button>
+      <button id="btn-atualizar-estoque" class="botao-acao">↻ Atualizar</button>
+    </div>
+    <div class="estoque-abas" role="tablist" aria-label="Visões do estoque">
+      <button type="button" class="estoque-aba ativa" data-estoque-aba="saldo">Estoque atual</button>
+      <button type="button" class="estoque-aba" data-estoque-aba="historico">Movimentações</button>
+    </div>
+    <section id="painel-estoque-saldo">
+      <div class="barra-acoes"><input id="busca-estoque" class="campo-busca" type="search" placeholder="Buscar material, categoria ou fornecedor"><select id="filtro-estoque" class="campo-filtro"><option value="Todos">Todos os materiais</option><option value="Baixo">Abaixo do mínimo</option><option value="Zerado">Sem saldo</option></select></div>
+      <div id="status-estoque" class="status">Consultando saldo dos materiais...</div>
+      <div id="lista-estoque" class="lista-registros"></div>
+    </section>
+    <section id="painel-estoque-historico" class="escondido">
+      <div class="barra-acoes"><input id="busca-mov-estoque" class="campo-busca" type="search" placeholder="Buscar material, pedido ou observação"><select id="filtro-mov-estoque" class="campo-filtro"><option value="Todos">Todos os tipos</option><option value="ENTRADA">Entradas</option><option value="SAIDA">Saídas</option><option value="AJUSTE">Ajustes</option></select></div>
+      <div id="status-mov-estoque" class="status">Consultando movimentações...</div>
+      <div id="lista-mov-estoque" class="lista-registros"></div>
+    </section>
+    <div class="aviso-modulo estoque-aviso"><strong>Integração com Produção:</strong> ao registrar uma saída, você pode vinculá-la a um pedido. O saldo do material é atualizado imediatamente e a movimentação fica registrada no histórico.</div>`;
+
+  $('btn-nova-movimentacao').addEventListener('click', () => abrirFormularioMovimentacaoEstoque());
+  $('btn-atualizar-estoque').addEventListener('click', atualizarEstoqueTela);
+  $('busca-estoque').addEventListener('input', renderListaEstoque);
+  $('filtro-estoque').addEventListener('change', renderListaEstoque);
+  $('busca-mov-estoque').addEventListener('input', renderListaMovimentacoesEstoque);
+  $('filtro-mov-estoque').addEventListener('change', renderListaMovimentacoesEstoque);
+  area.querySelectorAll('[data-estoque-aba]').forEach(btn => btn.addEventListener('click', () => alternarAbaEstoque(btn.dataset.estoqueAba)));
+  await atualizarEstoqueTela();
+}
+
+function alternarAbaEstoque(aba) {
+  abaEstoqueAtual = aba;
+  $('painel-estoque-saldo').classList.toggle('escondido', aba !== 'saldo');
+  $('painel-estoque-historico').classList.toggle('escondido', aba !== 'historico');
+  document.querySelectorAll('[data-estoque-aba]').forEach(btn => btn.classList.toggle('ativa', btn.dataset.estoqueAba === aba));
+}
+
+async function atualizarEstoqueTela() {
+  const status = $('status-estoque');
+  if (status) { status.className = 'status'; status.textContent = 'Atualizando estoque...'; }
+  try {
+    const [materiais, pedidos, movimentos] = await Promise.all([
+      chamarApi({action:'listarMateriais'}),
+      chamarApi({action:'listarPedidos'}),
+      chamarApi({action:'listarMovimentacoesEstoque',limite:200})
+    ]);
+    materiaisCache = materiais.dados.materiais || [];
+    pedidosEstoqueCache = pedidos.dados.pedidos || [];
+    movimentosEstoqueCache = movimentos.dados.movimentacoes || [];
+    atualizarResumoEstoque();
+    renderListaEstoque();
+    renderListaMovimentacoesEstoque();
+    const ativos = materiaisCache.filter(m => materialAtivoUI(m.ativo));
+    const baixo = ativos.filter(m => Number(m.estoque_minimo || 0) > 0 && Number(m.estoque_atual || 0) <= Number(m.estoque_minimo || 0));
+    status.className = 'status ok';
+    status.textContent = `${ativos.length} material(is) ativo(s) • ${baixo.length} no nível mínimo ou abaixo • ${movimentosEstoqueCache.length} movimentação(ões) recente(s).`;
+    const sm = $('status-mov-estoque');
+    if (sm) { sm.className = 'status ok'; sm.textContent = `${movimentosEstoqueCache.length} movimentação(ões) no histórico recente.`; }
+  } catch (error) {
+    if (status) { status.className = 'status error'; status.textContent = error.message || 'Não foi possível carregar o estoque.'; }
+    const sm = $('status-mov-estoque'); if (sm) { sm.className = 'status error'; sm.textContent = error.message || 'Não foi possível carregar o histórico.'; }
+  }
+}
+
+function atualizarResumoEstoque() {
+  const ativos = materiaisCache.filter(m => materialAtivoUI(m.ativo));
+  const baixo = ativos.filter(m => Number(m.estoque_minimo || 0) > 0 && Number(m.estoque_atual || 0) <= Number(m.estoque_minimo || 0));
+  const valor = ativos.reduce((total, m) => total + Number(m.estoque_atual || 0) * Number(m.custo_atual || 0), 0);
+  $('estoque-kpi-ativos').textContent = ativos.length;
+  $('estoque-kpi-baixo').textContent = baixo.length;
+  $('estoque-kpi-valor').textContent = moeda(valor);
+}
+
+function renderListaEstoque() {
+  const alvo = $('lista-estoque'); if (!alvo) return;
+  const termo = normalizarTexto($('busca-estoque')?.value || '');
+  const filtro = $('filtro-estoque')?.value || 'Todos';
+  const lista = materiaisCache.filter(m => {
+    if (!materialAtivoUI(m.ativo)) return false;
+    const saldo = Number(m.estoque_atual || 0), minimo = Number(m.estoque_minimo || 0);
+    const baixo = minimo > 0 && saldo <= minimo;
+    const texto = normalizarTexto([m.nome,m.categoria,m.fornecedor,m.id_material].join(' '));
+    return (!termo || texto.includes(termo)) && (filtro === 'Todos' || (filtro === 'Baixo' && baixo) || (filtro === 'Zerado' && saldo <= 0));
+  });
+  alvo.innerHTML = lista.length ? lista.map(m => {
+    const saldo = Number(m.estoque_atual || 0), minimo = Number(m.estoque_minimo || 0), baixo = minimo > 0 && saldo <= minimo;
+    return `<article class="registro estoque-registro">
+      <div class="registro-topo"><div><h3>${esc(m.nome)}</h3><div class="meta">${esc([m.categoria,m.fornecedor].filter(Boolean).join(' • ') || m.id_material)}</div><div class="meta">${esc(m.id_material)} · ${esc(m.unidade || '')}</div></div><div class="estoque-saldo ${baixo ? 'baixo' : ''}"><strong>${esc(quantidadeMaterialUI(saldo))}</strong><small>${esc(m.unidade || 'un')}</small></div></div>
+      <div class="registro-acoes"><span class="badge-status ${saldo > 0 ? 'aprovado' : 'cancelado'}">${saldo > 0 ? 'Disponível' : 'Sem saldo'}</span>${baixo ? '<span class="badge-status aguardando">Abaixo do mínimo</span>' : ''}<span class="meta">Mínimo: ${esc(quantidadeMaterialUI(minimo))} ${esc(m.unidade || '')} · Custo: ${esc(moeda(m.custo_atual))}</span></div>
+      <div class="registro-acoes"><button class="botao-acao destaque" data-estoque-entrada="${esc(m.id_material)}">＋ Entrada</button><button class="botao-acao" data-estoque-saida="${esc(m.id_material)}">− Saída</button><button class="botao-acao" data-estoque-ajuste="${esc(m.id_material)}">Ajustar saldo</button></div>
+    </article>`;
+  }).join('') : '<div class="vazio">Nenhum material corresponde a este filtro. Cadastre materiais no módulo Materiais antes de movimentar o estoque.</div>';
+  alvo.querySelectorAll('[data-estoque-entrada]').forEach(btn => btn.addEventListener('click', () => abrirFormularioMovimentacaoEstoque('ENTRADA',btn.dataset.estoqueEntrada)));
+  alvo.querySelectorAll('[data-estoque-saida]').forEach(btn => btn.addEventListener('click', () => abrirFormularioMovimentacaoEstoque('SAIDA',btn.dataset.estoqueSaida)));
+  alvo.querySelectorAll('[data-estoque-ajuste]').forEach(btn => btn.addEventListener('click', () => abrirFormularioMovimentacaoEstoque('AJUSTE',btn.dataset.estoqueAjuste)));
+}
+
+function renderListaMovimentacoesEstoque() {
+  const alvo = $('lista-mov-estoque'); if (!alvo) return;
+  const termo = normalizarTexto($('busca-mov-estoque')?.value || '');
+  const filtro = $('filtro-mov-estoque')?.value || 'Todos';
+  const lista = movimentosEstoqueCache.filter(m => {
+    const texto = normalizarTexto([m.material,m.id_material,m.id_pedido,m.fornecedor,m.observacoes,m.usuario].join(' '));
+    return (!termo || texto.includes(termo)) && (filtro === 'Todos' || String(m.tipo) === filtro);
+  });
+  alvo.innerHTML = lista.length ? lista.map(m => {
+    const tipo = String(m.tipo || '').toUpperCase();
+    const sinal = tipo === 'ENTRADA' ? '+' : (tipo === 'SAIDA' ? '−' : '↔');
+    const subtitulo = [dataBR(m.data_hora),m.id_material,m.id_pedido ? `Pedido ${m.id_pedido}` : '',m.fornecedor].filter(Boolean).join(' • ');
+    return `<article class="registro"><div class="registro-topo"><div><h3>${esc(m.material || 'Material')}</h3><div class="meta">${esc(subtitulo)}</div></div><div class="valor">${sinal}${esc(quantidadeMaterialUI(m.quantidade))} ${esc(m.unidade || '')}</div></div><div class="registro-acoes">${badge(tipo)}<span class="meta">Saldo: ${esc(quantidadeMaterialUI(m.saldo_anterior))} → ${esc(quantidadeMaterialUI(m.saldo_posterior))} ${esc(m.unidade || '')}</span>${Number(m.valor_total || 0) ? `<span class="meta">Valor: ${esc(moeda(m.valor_total))}</span>` : ''}</div>${m.observacoes ? `<div class="meta">${esc(m.observacoes)}</div>` : ''}</article>`;
+  }).join('') : '<div class="vazio">Nenhuma movimentação registrada ainda. As entradas e saídas aparecerão aqui.</div>';
+}
+
+function abrirFormularioMovimentacaoEstoque(tipoInicial = 'ENTRADA', materialInicial = '') {
+  const ativos = materiaisCache.filter(m => materialAtivoUI(m.ativo));
+  if (!ativos.length) { toast('Cadastre pelo menos um material ativo antes de registrar movimentações.'); return; }
+  const tipo = ['ENTRADA','SAIDA','AJUSTE'].includes(tipoInicial) ? tipoInicial : 'ENTRADA';
+  const pedidosAbertos = pedidosEstoqueCache.filter(p => !['Entregue','Cancelado'].includes(String(campo(p,['status','Status']))));
+  abrirModal('Nova movimentação de estoque', `
+    <form id="form-mov-estoque" class="form-grid">
+      <div class="form-grupo full"><label for="mov-tipo">Tipo de movimentação</label><select id="mov-tipo" class="campo-form" name="tipo"><option value="ENTRADA" ${tipo==='ENTRADA'?'selected':''}>Entrada de material</option><option value="SAIDA" ${tipo==='SAIDA'?'selected':''}>Saída de material</option><option value="AJUSTE" ${tipo==='AJUSTE'?'selected':''}>Ajuste de saldo</option></select></div>
+      <div class="form-grupo full"><label for="mov-material">Material *</label><select id="mov-material" class="campo-form" name="id_material" required><option value="">Selecione um material</option>${ativos.map(m => `<option value="${esc(m.id_material)}" ${String(m.id_material)===String(materialInicial)?'selected':''}>${esc(m.nome)} — ${esc(quantidadeMaterialUI(m.estoque_atual))} ${esc(m.unidade || '')}</option>`).join('')}</select></div>
+      <div class="form-grupo full"><label id="mov-quantidade-label" for="mov-quantidade">Quantidade *</label><input id="mov-quantidade" class="campo-form" type="number" name="quantidade" min="0" step="0.001" inputmode="decimal" required placeholder="Ex.: 2,5"></div>
+      <div class="form-grupo mov-entrada-campo"><label for="mov-custo">Custo unitário (R$)</label><input id="mov-custo" class="campo-form" type="number" name="custo_unitario" min="0" step="0.01" inputmode="decimal" placeholder="Deixe vazio para manter"></div>
+      <div class="form-grupo mov-entrada-campo"><label for="mov-fornecedor">Fornecedor</label><input id="mov-fornecedor" class="campo-form" name="fornecedor" maxlength="120" placeholder="Fornecedor da compra"></div>
+      <div class="form-grupo full mov-saida-campo"><label for="mov-pedido">Vincular à produção (opcional)</label><select id="mov-pedido" class="campo-form" name="id_pedido"><option value="">Sem vínculo com pedido</option>${pedidosAbertos.map(p => `<option value="${esc(campo(p,['id_pedido','id']))}">${esc(campo(p,['id_pedido','id']))} — ${esc(campo(p,['nome_cliente','cliente'],'Cliente'))} · ${esc(campo(p,['status'],'Em andamento'))}</option>`).join('')}</select><small class="ajuda-campo">A saída será associada ao pedido escolhido.</small></div>
+      <div class="form-grupo full"><label for="mov-observacoes">Observações</label><textarea id="mov-observacoes" class="campo-form textarea" name="observacoes" maxlength="500" placeholder="Ex.: compra, consumo na fabricação, perda ou conferência"></textarea></div>
+      <div class="form-grupo full"><div id="erro-form-mov-estoque" class="mensagem"></div></div>
+      <div class="form-grupo full form-acoes"><button type="button" class="botao-acao" data-fechar-modal>Cancelar</button><button type="submit" class="botao-acao destaque">Registrar movimentação</button></div>
+    </form>`);
+  const form = $('form-mov-estoque');
+  const atualizarCampos = () => {
+    const atual = $('mov-tipo').value;
+    form.querySelectorAll('.mov-entrada-campo').forEach(el => el.classList.toggle('escondido', atual !== 'ENTRADA'));
+    form.querySelectorAll('.mov-saida-campo').forEach(el => el.classList.toggle('escondido', atual !== 'SAIDA'));
+    $('mov-quantidade-label').textContent = atual === 'AJUSTE' ? 'Novo saldo contado *' : 'Quantidade *';
+    $('mov-quantidade').placeholder = atual === 'AJUSTE' ? 'Informe o saldo físico conferido' : 'Ex.: 2,5';
+  };
+  $('mov-tipo').addEventListener('change', atualizarCampos); atualizarCampos();
+  form.querySelector('[data-fechar-modal]').addEventListener('click', fecharModal);
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    const dados = Object.fromEntries(new FormData(form).entries());
+    if (dados.custo_unitario === '') delete dados.custo_unitario;
+    const botao = form.querySelector('[type=submit]'); botao.disabled = true; botao.textContent = 'Registrando...';
+    try {
+      const result = await chamarApi({action:'registrarMovimentacaoEstoque',movimento:dados});
+      fecharModal(); toast(result.dados?.mensagem || 'Movimentação registrada.');
+      await atualizarEstoqueTela();
+    } catch (error) {
+      const msg = $('erro-form-mov-estoque'); if (msg) msg.textContent = error.message || 'Não foi possível registrar a movimentação.';
+      botao.disabled = false; botao.textContent = 'Registrar movimentação';
+    }
+  });
 }
 
 function renderModuloEmPreparacao(area, nome) {
