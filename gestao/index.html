@@ -9,11 +9,11 @@
   <meta name="apple-mobile-web-app-title" content="Tinhas Gestão">
   <meta name="description" content="Aplicativo interno de gestão da Tinhas Decorações.">
   <title>Tinhas Gestão</title>
-  <link rel="manifest" href="manifest.json?v=1.2.1">
+  <link rel="manifest" href="manifest.json?v=1.2.2">
   <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
   <link rel="apple-touch-icon" href="assets/icon-192.png">
   <link rel="preload" as="image" href="assets/splash-tinhas.webp" fetchpriority="high">
-  <link rel="stylesheet" href="style.css?v=1.2.1">
+  <link rel="stylesheet" href="style.css?v=1.2.2">
 </head>
 <body>
   <section id="tela-abertura" class="tela-abertura" aria-label="Abertura do Tinhas Gestão">
@@ -42,7 +42,7 @@
         <button id="btn-login" class="botao-principal" type="submit">Entrar</button>
         <p id="mensagem-login" class="mensagem" role="status"></p>
       </form>
-<p class="rodape-login">Tinhas Decorações LTDA <span>•</span> v.1.2.1</p>
+<p class="rodape-login">Tinhas Decorações LTDA <span>•</span> v.1.2.2</p>
     </div>
   </section>
 
@@ -67,8 +67,8 @@
       <section class="grid-modulos">
         <button class="modulo" data-modulo="clientes"><div class="emoji">👥</div><strong>Clientes</strong><span>Cadastro e relacionamento</span></button>
         <button class="modulo" data-modulo="orcamentos"><div class="emoji">📄</div><strong>Orçamentos</strong><span>Projetos, valores e aprovações</span></button>
-        <button class="modulo" data-modulo="producao"><div class="emoji"><svg class="icone-vetor" viewBox="0 0 32 32" role="img" aria-label="Serrote de marcenaria" xmlns="http://www.w3.org/2000/svg"><path d="M8.4 11.6 25.8 5.8 27.2 19.2 10.4 16.4 8.4 11.6Z"/><path d="M8.8 12 4.2 7.1Q2.6 5.4 4.1 3.9L6 2.7q1.5-.9 2.8.5l5.1 5.6"/><path d="m10.4 16.4 1.4 2.1 1.5-1.6 1.5 2 1.5-1.6 1.5 2 1.5-1.6 1.5 1.9 1.5-1.6 1.5 1.8"/></svg></div><strong>Produção</strong><span>Pedidos e andamento</span></button>
-        <button class="modulo" data-modulo="materiais"><div class="emoji"><svg class="icone-vetor" viewBox="0 0 32 32" role="img" aria-label="Tábuas de madeira" xmlns="http://www.w3.org/2000/svg"><path d="M4 7.5 21.5 3l6.5 4-17.5 4.5z"/><path d="M10.5 11.5V16l17.5-4.5v-4"/><path d="M4 7.5v4l6.5 4.5"/><path d="m4 16 17.5-4.5 6.5 4-17.5 4.5z"/><path d="M10.5 20v4.5L28 20v-4.5"/><path d="M4 16v4l6.5 4.5"/><path d="m4 24.5 17.5-4.5 6.5 4-17.5 4.5z"/><path d="M14 8.3c1.7-.8 3.5-1.2 5.2-1.4M14 17.2c1.7-.8 3.5-1.2 5.2-1.4M14 25.7c1.7-.8 3.5-1.2 5.2-1.4"/></svg></div><strong>Materiais</strong><span>Madeira, ferragens e insumos</span></button>
+        <button class="modulo" data-modulo="producao"><div class="emoji">🛠️</div><strong>Produção</strong><span>Pedidos e andamento</span></button>
+        <button class="modulo" data-modulo="materiais"><div class="emoji">🪵</div><strong>Materiais</strong><span>Madeira, ferragens e insumos</span></button>
         <button class="modulo" data-modulo="estoque"><div class="emoji">📦</div><strong>Estoque</strong><span>Entradas e disponibilidade</span></button>
         <button class="modulo" data-modulo="financeiro"><div class="emoji">💰</div><strong>Financeiro</strong><span>Receitas, despesas e caixa</span></button>
         <button class="modulo" data-modulo="agenda"><div class="emoji">📅</div><strong>Agenda</strong><span>Prazos e entregas</span></button>
@@ -97,8 +97,8 @@
       <button data-drawer="inicio">🏠 Início</button>
       <button data-drawer="clientes">👥 Clientes</button>
       <button data-drawer="orcamentos">📄 Orçamentos</button>
-      <button data-drawer="producao"><svg class="icone-drawer" viewBox="0 0 32 32" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M8.4 11.6 25.8 5.8 27.2 19.2 10.4 16.4 8.4 11.6Z"/><path d="M8.8 12 4.2 7.1Q2.6 5.4 4.1 3.9L6 2.7q1.5-.9 2.8.5l5.1 5.6"/><path d="m10.4 16.4 1.4 2.1 1.5-1.6 1.5 2 1.5-1.6 1.5 2 1.5-1.6 1.5 1.9 1.5-1.6 1.5 1.8"/></svg> Produção</button>
-      <button data-drawer="materiais"><svg class="icone-drawer" viewBox="0 0 32 32" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M4 7.5 21.5 3l6.5 4-17.5 4.5z"/><path d="M10.5 11.5V16l17.5-4.5v-4"/><path d="M4 7.5v4l6.5 4.5"/><path d="m4 16 17.5-4.5 6.5 4-17.5 4.5z"/><path d="M10.5 20v4.5L28 20v-4.5"/><path d="M4 16v4l6.5 4.5"/><path d="m4 24.5 17.5-4.5 6.5 4-17.5 4.5z"/><path d="M14 8.3c1.7-.8 3.5-1.2 5.2-1.4M14 17.2c1.7-.8 3.5-1.2 5.2-1.4M14 25.7c1.7-.8 3.5-1.2 5.2-1.4"/></svg> Materiais</button>
+      <button data-drawer="producao">🛠️ Produção</button>
+      <button data-drawer="materiais">🪵 Materiais</button>
       <button data-drawer="estoque">📦 Estoque</button>
       <button data-drawer="financeiro">💰 Financeiro</button>
       <button data-drawer="agenda">📅 Agenda</button>
@@ -110,7 +110,7 @@
 
   <div id="modal-root"></div>
   <div id="toast" class="toast escondido" role="status"></div>
-  <script src="config.js?v=1.2.1"></script>
-  <script src="app.js?v=1.2.1"></script>
+  <script src="config.js?v=1.2.2"></script>
+  <script src="app.js?v=1.2.2"></script>
 </body>
 </html>
