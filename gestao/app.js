@@ -305,8 +305,8 @@ function voltarInicio() { moduloAtual = null; mostrarTela('tela-home'); }
 const MODULOS = {
   clientes: {titulo:'Clientes',icone:'👥',descricao:'Cadastros e relacionamento com os clientes.'},
   orcamentos: {titulo:'Orçamentos',icone:'📄',descricao:'Projetos, valores, validade e aprovações.'},
-  producao: {titulo:'Produção',icone:'🪚',descricao:'Acompanhe os pedidos e as etapas da fabricação.'},
-  materiais: {titulo:'Materiais',icone:'🪵',descricao:'Madeira, metalon, ferragens e insumos.'},
+  producao: {titulo:'Produção',icone:`<svg class="icone-vetor icone-vetor-modulo" viewBox="0 0 32 32" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M8.4 11.6 25.8 5.8 27.2 19.2 10.4 16.4 8.4 11.6Z"/><path d="M8.8 12 4.2 7.1Q2.6 5.4 4.1 3.9L6 2.7q1.5-.9 2.8.5l5.1 5.6"/><path d="m10.4 16.4 1.4 2.1 1.5-1.6 1.5 2 1.5-1.6 1.5 2 1.5-1.6 1.5 1.9 1.5-1.6 1.5 1.8"/></svg>`,descricao:'Acompanhe os pedidos e as etapas da fabricação.'},
+  materiais: {titulo:'Materiais',icone:`<svg class="icone-vetor icone-vetor-modulo" viewBox="0 0 32 32" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M4 7.5 21.5 3l6.5 4-17.5 4.5z"/><path d="M10.5 11.5V16l17.5-4.5v-4"/><path d="M4 7.5v4l6.5 4.5"/><path d="m4 16 17.5-4.5 6.5 4-17.5 4.5z"/><path d="M10.5 20v4.5L28 20v-4.5"/><path d="M4 16v4l6.5 4.5"/><path d="m4 24.5 17.5-4.5 6.5 4-17.5 4.5z"/><path d="M14 8.3c1.7-.8 3.5-1.2 5.2-1.4M14 17.2c1.7-.8 3.5-1.2 5.2-1.4M14 25.7c1.7-.8 3.5-1.2 5.2-1.4"/></svg>`,descricao:'Madeira, metalon, ferragens e insumos.'},
   estoque: {titulo:'Estoque',icone:'📦',descricao:'Entradas, saídas e disponibilidade de materiais.'},
   financeiro: {titulo:'Financeiro',icone:'💰',descricao:'Receitas, despesas, pagamentos e saldo.'},
   agenda: {titulo:'Agenda',icone:'📅',descricao:'Prazos de fabricação, visitas e entregas.'},

@@ -489,3 +489,8 @@ body { max-width:520px; margin:0 auto; }
 .usuario-situacao.inativo { background:#f6dada;color:#8e2020; }
 .ajuda-campo { color:#78695f;font-size:10px;line-height:1.35; }
 #form-criar-usuario .campo-form, #form-alterar-senha .campo-form { width:100%;box-sizing:border-box; }
+
+/* Ícones vetoriais de marcenaria — compatíveis com navegadores sem emoji de serrote/lenha. */
+.emoji .icone-vetor{width:27px;height:27px;display:block;fill:none;stroke:currentColor;stroke-width:1.65;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+.cabecalho-modulo .icone-vetor-modulo{width:29px;height:29px;display:block;fill:none;stroke:var(--laranja);stroke-width:1.65;stroke-linecap:round;stroke-linejoin:round}
+.drawer>button .icone-drawer{width:19px;height:19px;display:inline-block;vertical-align:-4px;margin-right:8px;color:var(--laranja);fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
