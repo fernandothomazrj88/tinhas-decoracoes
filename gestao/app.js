@@ -1,6 +1,6 @@
 'use strict';
 
-const TINHAS_VERSION = (window.TINHAS_CONFIG && window.TINHAS_CONFIG.APP_VERSION) || '1.2.2';
+const TINHAS_VERSION = (window.TINHAS_CONFIG && window.TINHAS_CONFIG.APP_VERSION) || '1.3.0';
 const STORAGE_TOKEN = 'tinhas_gestao_token';
 const STORAGE_USER = 'tinhas_gestao_usuario';
 const STATUS_PRODUCAO = ['Aguardando material', 'Em produção', 'Acabamento', 'Pronto', 'Entregue', 'Cancelado'];
@@ -13,6 +13,7 @@ let moduloAtual = null;
 let clientesCache = [];
 let orcamentosCache = [];
 let pedidosCache = [];
+let materiaisCache = [];
 let installPromptEvent = null;
 
 const $ = id => document.getElementById(id);
@@ -327,6 +328,7 @@ async function abrirModulo(nome) {
     if (nome === 'clientes') await renderClientes(area);
     else if (nome === 'orcamentos') await renderOrcamentos(area);
     else if (nome === 'producao') await renderProducao(area);
+    else if (nome === 'materiais') await renderMateriais(area);
     else if (nome === 'configuracoes') await renderConfiguracoes(area);
     else renderModuloEmPreparacao(area, nome);
   } catch (error) {
@@ -431,6 +433,148 @@ async function salvarAlteracaoSenha(event) {
     mensagem.style.display = 'block';
     botao.disabled = false; botao.textContent = 'Atualizar senha';
   }
+}
+
+
+
+/* =====================================================
+   MATERIAIS — CATÁLOGO
+===================================================== */
+function materialAtivoUI(valor) {
+  return valor === true || ['true','sim','1'].includes(String(valor).toLowerCase().trim());
+}
+function quantidadeMaterialUI(valor) {
+  return Number(valor || 0).toLocaleString('pt-BR', {maximumFractionDigits:3});
+}
+async function renderMateriais(area) {
+  const config = MODULOS.materiais;
+  area.innerHTML = cabecalhoModulo(config) + `
+    <div class="barra-acoes">
+      <input id="busca-materiais" class="campo-busca" type="search" placeholder="Buscar por material, categoria ou fornecedor">
+      <select id="filtro-materiais" class="campo-filtro" aria-label="Filtrar materiais">
+        <option value="Todos">Todos</option><option value="Ativos">Ativos</option><option value="Inativos">Inativos</option><option value="Baixo">Estoque baixo</option>
+      </select>
+      <button id="novo-material" class="botao-acao destaque">＋ Novo</button>
+      <button id="atualizar-materiais" class="botao-acao" title="Atualizar lista">↻</button>
+    </div>
+    <div id="status-materiais" class="status">Consultando materiais...</div>
+    <div id="lista-materiais" class="lista-registros"></div>
+    <div class="aviso-modulo"><strong>Como funciona:</strong> aqui você cadastra os materiais, unidades, fornecedores e custos. O saldo atual é informado no cadastro inicial; as entradas e saídas serão controladas no módulo Estoque.</div>`;
+  $('novo-material').addEventListener('click', () => abrirFormularioMaterial());
+  $('atualizar-materiais').addEventListener('click', atualizarListaMateriais);
+  $('busca-materiais').addEventListener('input', renderListaMateriais);
+  $('filtro-materiais').addEventListener('change', renderListaMateriais);
+  await atualizarListaMateriais();
+}
+async function atualizarListaMateriais() {
+  const status = $('status-materiais');
+  if (!status) return;
+  status.className = 'status'; status.textContent = 'Consultando materiais...';
+  try {
+    const result = await chamarApi({action:'listarMateriais'});
+    materiaisCache = result.dados.materiais || [];
+    renderListaMateriais();
+    const ativos = materiaisCache.filter(m => materialAtivoUI(m.ativo)).length;
+    const baixo = materiaisCache.filter(m => materialAtivoUI(m.ativo) && Number(m.estoque_minimo || 0) > 0 && Number(m.estoque_atual || 0) <= Number(m.estoque_minimo || 0)).length;
+    status.className = 'status ok';
+    status.textContent = `${materiaisCache.length} material(is) cadastrado(s) • ${ativos} ativo(s) • ${baixo} abaixo do mínimo.`;
+  } catch (error) {
+    status.className = 'status error'; status.textContent = error.message || 'Não foi possível carregar os materiais.';
+  }
+}
+function renderListaMateriais() {
+  const alvo = $('lista-materiais');
+  if (!alvo) return;
+  const termo = String($('busca-materiais')?.value || '').toLowerCase().trim();
+  const filtro = $('filtro-materiais')?.value || 'Todos';
+  const lista = materiaisCache.filter(m => {
+    const texto = [m.nome,m.categoria,m.unidade,m.fornecedor,m.id_material].join(' ').toLowerCase();
+    const ativo = materialAtivoUI(m.ativo);
+    const baixo = Number(m.estoque_minimo || 0) > 0 && Number(m.estoque_atual || 0) <= Number(m.estoque_minimo || 0);
+    return (!termo || texto.includes(termo)) &&
+      (filtro === 'Todos' || (filtro === 'Ativos' && ativo) || (filtro === 'Inativos' && !ativo) || (filtro === 'Baixo' && ativo && baixo));
+  });
+  alvo.innerHTML = lista.length ? lista.map(m => {
+    const baixo = Number(m.estoque_minimo || 0) > 0 && Number(m.estoque_atual || 0) <= Number(m.estoque_minimo || 0);
+    const ativo = materialAtivoUI(m.ativo);
+    const meta = [m.categoria,m.unidade,m.fornecedor].filter(Boolean).join(' • ');
+    return `<article class="registro">
+      <div class="registro-topo"><div><h3>${esc(m.nome || 'Material sem nome')}</h3><div class="meta">${esc(meta || 'Sem categoria ou fornecedor')}</div><div class="meta">${esc(m.id_material || '')}</div></div><div class="valor">${esc(moeda(m.custo_atual))}</div></div>
+      <div class="registro-acoes"><span class="badge-status ${ativo ? 'aprovado' : 'cancelado'}">${ativo ? 'Ativo' : 'Inativo'}</span>${baixo ? '<span class="badge-status aguardando">Estoque baixo</span>' : ''}<span class="meta">Saldo: ${esc(quantidadeMaterialUI(m.estoque_atual))} ${esc(m.unidade || '')} · mínimo ${esc(quantidadeMaterialUI(m.estoque_minimo))}</span></div>
+      <div class="registro-acoes"><button class="botao-acao destaque" data-material-editar="${esc(m.id_material)}">Editar</button><button class="botao-acao" data-material-detalhe="${esc(m.id_material)}">Detalhes</button><button class="botao-acao" data-material-status="${esc(m.id_material)}">${ativo ? 'Desativar' : 'Ativar'}</button></div>
+    </article>`;
+  }).join('') : '<div class="vazio">Nenhum material encontrado. Use “＋ Novo” para cadastrar madeira, metalon, ferragens ou insumos.</div>';
+  alvo.querySelectorAll('[data-material-editar]').forEach(btn => btn.addEventListener('click', () => {
+    const m = materiaisCache.find(x => String(x.id_material) === btn.dataset.materialEditar); if (m) abrirFormularioMaterial(m);
+  }));
+  alvo.querySelectorAll('[data-material-detalhe]').forEach(btn => btn.addEventListener('click', () => {
+    const m = materiaisCache.find(x => String(x.id_material) === btn.dataset.materialDetalhe); if (m) abrirDetalhesMaterial(m);
+  }));
+  alvo.querySelectorAll('[data-material-status]').forEach(btn => btn.addEventListener('click', () => alterarStatusMaterialTela(btn.dataset.materialStatus)));
+}
+function abrirFormularioMaterial(material = null) {
+  const editar = !!material;
+  const id = material ? String(material.id_material || '') : '';
+  const ativo = editar ? materialAtivoUI(material.ativo) : true;
+  const estoqueAtual = Number(material?.estoque_atual || 0);
+  abrirModal(editar ? 'Editar material' : 'Cadastrar material', `
+    <form id="form-material" class="form-grid">
+      <div class="form-grupo full"><label>Nome do material *</label><input class="campo-form" name="nome" required maxlength="120" placeholder="Ex.: Pinus 2,5 x 28 cm" value="${esc(material?.nome || '')}"></div>
+      <div class="form-grupo"><label>Categoria *</label><input class="campo-form" name="categoria" list="lista-categorias-material" required placeholder="Ex.: Madeira" value="${esc(material?.categoria || '')}"><datalist id="lista-categorias-material"><option>Madeira</option><option>Metalon</option><option>Ferragens</option><option>Acabamentos</option><option>Insumos</option><option>Embalagens</option><option>Outros</option></datalist></div>
+      <div class="form-grupo"><label>Unidade *</label><input class="campo-form" name="unidade" list="lista-unidades-material" required placeholder="Ex.: m, un, kg" value="${esc(material?.unidade || '')}"><datalist id="lista-unidades-material"><option>un</option><option>m</option><option>cm</option><option>m²</option><option>kg</option><option>L</option><option>par</option><option>pct</option><option>barra</option><option>chapa</option><option>rolo</option></datalist></div>
+      <div class="form-grupo"><label>Custo atual (R$)</label><input class="campo-form" name="custo_atual" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(material?.custo_atual ?? 0)}"></div>
+      <div class="form-grupo"><label>Fornecedor</label><input class="campo-form" name="fornecedor" maxlength="120" value="${esc(material?.fornecedor || '')}" placeholder="Nome da loja ou fornecedor"></div>
+      <div class="form-grupo"><label>Estoque mínimo</label><input class="campo-form" name="estoque_minimo" type="number" min="0" step="0.001" inputmode="decimal" value="${esc(material?.estoque_minimo ?? 0)}"></div>
+      ${editar ? `<div class="form-grupo full"><div class="aviso-modulo">Saldo atual: <strong>${esc(quantidadeMaterialUI(estoqueAtual))} ${esc(material?.unidade || '')}</strong>. Para registrar entradas e saídas, use o módulo Estoque. O saldo não será alterado nesta edição.</div></div>` : `<div class="form-grupo"><label>Saldo inicial</label><input class="campo-form" name="estoque_atual" type="number" min="0" step="0.001" inputmode="decimal" value="0"></div>`}
+      <div class="form-grupo"><label>Situação</label><select class="campo-form" name="ativo"><option value="true" ${ativo ? 'selected' : ''}>Ativo</option><option value="false" ${!ativo ? 'selected' : ''}>Inativo</option></select></div>
+      <div class="form-grupo full"><div id="erro-form-material" class="mensagem"></div></div>
+      <div class="form-grupo full form-acoes"><button type="button" class="botao-acao" data-fechar-modal>Cancelar</button><button type="submit" class="botao-acao destaque">${editar ? 'Salvar alterações' : 'Cadastrar material'}</button></div>
+    </form>`);
+  $('form-material').addEventListener('submit', async event => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const dados = Object.fromEntries(new FormData(form).entries());
+    dados.custo_atual = Number(dados.custo_atual || 0);
+    dados.estoque_minimo = Number(dados.estoque_minimo || 0);
+    dados.ativo = dados.ativo === 'true';
+    if (!editar) dados.estoque_atual = Number(dados.estoque_atual || 0);
+    const submit = form.querySelector('[type=submit]'); submit.disabled = true; submit.textContent = 'Salvando...';
+    try {
+      const result = editar
+        ? await chamarApi({action:'atualizarMaterial',id_material:id,material:dados})
+        : await chamarApi({action:'cadastrarMaterial',material:dados});
+      fecharModal(); toast(result.dados?.mensagem || 'Material salvo com sucesso.'); await atualizarListaMateriais();
+    } catch (error) {
+      const msg = $('erro-form-material'); if (msg) msg.textContent = error.message || 'Não foi possível salvar o material.';
+      submit.disabled = false; submit.textContent = editar ? 'Salvar alterações' : 'Cadastrar material';
+    }
+  });
+  $('form-material').querySelector('[data-fechar-modal]').addEventListener('click', fecharModal);
+}
+function abrirDetalhesMaterial(material) {
+  const linhas = [
+    ['Categoria',material.categoria],['Unidade',material.unidade],['Custo atual',moeda(material.custo_atual)],['Fornecedor',material.fornecedor || '—'],
+    ['Estoque atual',`${quantidadeMaterialUI(material.estoque_atual)} ${material.unidade || ''}`],['Estoque mínimo',`${quantidadeMaterialUI(material.estoque_minimo)} ${material.unidade || ''}`],
+    ['Situação',materialAtivoUI(material.ativo) ? 'Ativo' : 'Inativo'],['Última atualização',dataBR(material.atualizado_em)]
+  ];
+  abrirModal(material.nome || 'Material', `<div class="lista-registros">${linhas.map(([a,b]) => `<div class="registro"><div class="meta">${esc(a)}</div><strong>${esc(b)}</strong></div>`).join('')}</div><div class="form-acoes"><button class="botao-acao destaque" data-fechar-modal>Fechar</button></div>`);
+  $('modal-root').querySelector('[data-fechar-modal]').addEventListener('click', fecharModal);
+}
+async function alterarStatusMaterialTela(id) {
+  const material = materiaisCache.find(m => String(m.id_material) === String(id));
+  if (!material) return;
+  const novoAtivo = !materialAtivoUI(material.ativo);
+  const acao = novoAtivo ? 'reativar' : 'desativar';
+  if (!confirm(`Deseja ${acao} o material “${material.nome}”?`)) return;
+  try {
+    const dados = {
+      nome: material.nome, categoria: material.categoria, unidade: material.unidade,
+      custo_atual: Number(material.custo_atual || 0), fornecedor: material.fornecedor || '',
+      estoque_minimo: Number(material.estoque_minimo || 0), ativo: novoAtivo
+    };
+    const result = await chamarApi({action:'atualizarMaterial',id_material:id,material:dados});
+    toast(result.dados?.mensagem || 'Situação atualizada.'); await atualizarListaMateriais();
+  } catch (error) { toast(error.message || 'Não foi possível atualizar a situação.'); }
 }
 
 function renderModuloEmPreparacao(area, nome) {
