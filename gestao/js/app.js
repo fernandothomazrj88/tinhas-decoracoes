@@ -1,6 +1,6 @@
 'use strict';
 
-const TINHAS_VERSION = (window.TINHAS_CONFIG && window.TINHAS_CONFIG.APP_VERSION) || '1.1.4';
+const TINHAS_VERSION = (window.TINHAS_CONFIG && window.TINHAS_CONFIG.APP_VERSION) || '1.2.0';
 const STORAGE_TOKEN = 'tinhas_gestao_token';
 const STORAGE_USER = 'tinhas_gestao_usuario';
 const STATUS_PRODUCAO = ['Aguardando material', 'Em produção', 'Acabamento', 'Pronto', 'Entregue', 'Cancelado'];
@@ -85,6 +85,8 @@ function toast(message) {
 function mostrarTela(id) {
   ['tela-login','tela-home','tela-modulo'].forEach(tela => $(tela).classList.toggle('escondido', tela !== id));
   window.scrollTo(0, 0);
+  const telaAtiva = $(id);
+  if (telaAtiva) telaAtiva.scrollTop = 0;
 }
 function salvarSessao(result) {
   sessao = {token: result.token, usuario: result.usuario};
@@ -218,14 +220,14 @@ async function iniciarApp() {
 
 async function entrar(event) {
   event.preventDefault();
-  const email = $('email').value.trim().toLowerCase();
+  const usuario = $('usuario').value.trim();
   const senha = $('senha').value;
   const botao = $('btn-login');
   const mensagem = $('mensagem-login');
   mensagem.textContent = '';
   botao.disabled = true; botao.textContent = 'Entrando...';
   try {
-    const result = await chamarApi({action:'login', email, senha}, false);
+    const result = await chamarApi({action:'login', usuario, senha}, false);
     salvarSessao(result.dados);
     $('senha').value = '';
     abrirHome();
@@ -242,7 +244,7 @@ async function sair() {
   limparSessao();
   moduloAtual = null;
   $('senha').value = '';
-  $('email').value = '';
+  $('usuario').value = '';
   fecharMenu();
   mostrarTela('tela-login');
 }
@@ -252,7 +254,7 @@ function abrirHome() {
   const user = sessao.usuario || {};
   const nome = user.nome || user.email || 'Equipe Tinhas';
   $('nome-usuario').textContent = nome;
-  const identificador = normalizarTexto(`${user.nome || ''} ${user.email || ''}`);
+  const identificador = normalizarTexto(`${user.nome || ''} ${user.usuario || ''} ${user.email || ''}`);
   const hero = $('hero-home');
   const imagem = $('hero-usuario');
   const frase = $('hero-frase');
@@ -325,7 +327,7 @@ async function abrirModulo(nome) {
     if (nome === 'clientes') await renderClientes(area);
     else if (nome === 'orcamentos') await renderOrcamentos(area);
     else if (nome === 'producao') await renderProducao(area);
-    else if (nome === 'configuracoes') renderConfiguracoes(area);
+    else if (nome === 'configuracoes') await renderConfiguracoes(area);
     else renderModuloEmPreparacao(area, nome);
   } catch (error) {
     area.innerHTML = cabecalhoModulo(config) + `<div class="erro">${esc(error.message)}</div><div class="form-acoes"><button class="botao-acao" data-voltar-inicio>Voltar ao início</button></div>`;
@@ -335,14 +337,43 @@ async function abrirModulo(nome) {
 function cabecalhoModulo(config) {
   return `<div class="cabecalho-modulo"><div class="icone-grande">${config.icone}</div><div><h2>${esc(config.titulo)}</h2><p>${esc(config.descricao)}</p></div></div>`;
 }
-function renderConfiguracoes(area) {
+async function renderConfiguracoes(area) {
   const user = sessao.usuario || {};
+  const ehAdmin = ['administrador','admin'].includes(normalizarTexto(user.papel || ''));
+  let blocoUsuarios = '';
+  if (ehAdmin) {
+    try {
+      const result = await chamarApi({action:'listarUsuarios'});
+      const usuarios = result.dados.usuarios || [];
+      blocoUsuarios = `
+        <section class="cartao-configuracoes painel-usuarios">
+          <h3>Gerenciar usuários</h3>
+          <p class="config-ajuda">Crie acessos para a equipe usando nome de usuário e senha. E-mail não é necessário.</p>
+          <div class="lista-usuarios-config">${usuarios.map(u => `
+            <div class="usuario-config-item">
+              <div><strong>${esc(u.nome || 'Usuário')}</strong><small>@${esc(u.usuario || 'sem-login')} · ${esc(u.papel || 'Equipe')}</small></div>
+              <span class="usuario-situacao ${u.ativo ? 'ativo' : 'inativo'}">${u.ativo ? 'Ativo' : 'Inativo'}</span>
+            </div>`).join('') || '<div class="vazio">Nenhum usuário cadastrado.</div>'}</div>
+          <h3 class="titulo-criar-usuario">Criar novo usuário</h3>
+          <form id="form-criar-usuario" class="form-grid">
+            <div class="form-grupo full"><label for="novo-nome">Nome da pessoa</label><input id="novo-nome" class="campo-form" type="text" maxlength="80" placeholder="Ex.: Matheus Silva" required></div>
+            <div class="form-grupo full"><label for="novo-usuario">Nome de usuário</label><input id="novo-usuario" class="campo-form" type="text" minlength="3" maxlength="32" placeholder="Ex.: matheusmarcenaria" autocapitalize="none" spellcheck="false" required></div>
+            <div class="form-grupo full"><label for="nova-senha-inicial">Senha inicial</label><input id="nova-senha-inicial" class="campo-form" type="password" minlength="6" maxlength="128" autocomplete="new-password" required><small class="ajuda-campo">Mínimo de 6 caracteres. A pessoa poderá trocar depois em Configurações.</small></div>
+            <div class="form-grupo full"><label for="novo-papel">Perfil de acesso</label><select id="novo-papel" class="campo-form"><option value="Equipe">Equipe</option><option value="Administrador">Administrador</option></select></div>
+            <p id="mensagem-criar-usuario" class="status error" style="display:none" role="alert"></p>
+            <div class="form-acoes full"><button id="btn-criar-usuario" type="submit" class="botao-acao destaque">Criar usuário</button></div>
+          </form>
+        </section>`;
+    } catch (error) {
+      blocoUsuarios = `<section class="cartao-configuracoes"><h3>Gerenciar usuários</h3><p class="status error">${esc(error.message || 'Não foi possível carregar a equipe.')}</p></section>`;
+    }
+  }
   area.innerHTML = cabecalhoModulo(MODULOS.configuracoes) + `
-    <section class="cartao-configuracoes" style="background:#fff;border:1px solid #e4d8ca;border-radius:16px;padding:16px;margin:14px 0;box-shadow:0 4px 14px rgba(0,0,0,.06)">
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px"><div class="icone-grande">👤</div><div><strong>${esc(user.nome || 'Usuário')}</strong><div style="font-size:13px;color:#66584d">${esc(user.email || '')}</div><small style="color:#8a7765">${esc(user.papel || 'Equipe Tinhas')}</small></div></div>
-      <h3 style="margin:8px 0;color:#17120f">Privacidade e segurança</h3>
-      <p style="font-size:13px;color:#66584d;line-height:1.5;margin:0 0 16px">Sua senha é individual. Depois de alterada, somente a nova senha poderá ser usada para entrar nesta conta.</p>
-      <h3 style="margin:8px 0;color:#17120f">Alterar senha</h3>
+    <section class="cartao-configuracoes">
+      <div class="perfil-config"><div class="icone-grande">👤</div><div><strong>${esc(user.nome || 'Usuário')}</strong><div class="perfil-login">@${esc(user.usuario || 'usuário')}</div><small>${esc(user.papel || 'Equipe Tinhas')}</small></div></div>
+      <h3>Privacidade e segurança</h3>
+      <p class="config-ajuda">Sua senha é individual. Você pode alterá-la sempre que quiser.</p>
+      <h3 class="titulo-criar-usuario">Alterar senha</h3>
       <form id="form-alterar-senha" class="form-grid">
         <div class="form-grupo full"><label for="senha-atual">Senha atual</label><input id="senha-atual" class="campo-form" type="password" autocomplete="current-password" required></div>
         <div class="form-grupo full"><label for="senha-nova">Nova senha (mínimo de 8 caracteres)</label><input id="senha-nova" class="campo-form" type="password" minlength="8" maxlength="128" autocomplete="new-password" required></div>
@@ -351,8 +382,33 @@ function renderConfiguracoes(area) {
         <div class="form-acoes full"><button id="btn-salvar-senha" type="submit" class="botao-acao destaque">Atualizar senha</button></div>
       </form>
     </section>
-    <div class="aviso-modulo"><strong>Conta protegida</strong><br>As credenciais são armazenadas de forma protegida no sistema. Não compartilhe sua senha com outras pessoas.</div>`;
+    ${blocoUsuarios}
+    <div class="aviso-modulo"><strong>Conta protegida</strong><br>As senhas não são exibidas nem armazenadas em texto aberto.</div>`;
   $('form-alterar-senha').addEventListener('submit', salvarAlteracaoSenha);
+  $('form-criar-usuario')?.addEventListener('submit', criarNovoUsuarioConfig);
+}
+
+async function criarNovoUsuarioConfig(event) {
+  event.preventDefault();
+  const botao = $('btn-criar-usuario');
+  const mensagem = $('mensagem-criar-usuario');
+  const dados = {
+    nome: $('novo-nome').value.trim(),
+    usuario: $('novo-usuario').value.trim(),
+    senhaInicial: $('nova-senha-inicial').value,
+    papel: $('novo-papel').value
+  };
+  mensagem.style.display = 'none';
+  botao.disabled = true; botao.textContent = 'Criando...';
+  try {
+    const result = await chamarApi({action:'criarUsuario', usuarioDados:dados});
+    toast(result.dados.mensagem || 'Usuário criado com sucesso!');
+    await renderConfiguracoes($('modulo-conteudo'));
+  } catch (error) {
+    mensagem.textContent = error.message || 'Não foi possível criar o usuário.';
+    mensagem.style.display = 'block';
+    botao.disabled = false; botao.textContent = 'Criar usuário';
+  }
 }
 
 async function salvarAlteracaoSenha(event) {
@@ -368,9 +424,8 @@ async function salvarAlteracaoSenha(event) {
   botao.disabled = true; botao.textContent = 'Salvando...';
   try {
     await chamarApi({action:'alterarSenha', senhaAtual:atual, novaSenha:nova, confirmacao});
-    localStorage.setItem(STORAGE_USER, JSON.stringify(sessao.usuario));
     toast('Senha alterada com sucesso!');
-    renderConfiguracoes($('modulo-conteudo'));
+    await renderConfiguracoes($('modulo-conteudo'));
   } catch (error) {
     mensagem.textContent = error.message || 'Não foi possível alterar a senha.';
     mensagem.style.display = 'block';

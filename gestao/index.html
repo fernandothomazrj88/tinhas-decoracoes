@@ -9,11 +9,11 @@
   <meta name="apple-mobile-web-app-title" content="Tinhas Gestão">
   <meta name="description" content="Aplicativo interno de gestão da Tinhas Decorações.">
   <title>Tinhas Gestão</title>
-  <link rel="manifest" href="manifest.json?v=1.1.4">
+  <link rel="manifest" href="manifest.json?v=1.2.0">
   <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
   <link rel="apple-touch-icon" href="assets/icon-192.png">
   <link rel="preload" as="image" href="assets/splash-tinhas.webp" fetchpriority="high">
-  <link rel="stylesheet" href="style.css?v=1.1.4">
+  <link rel="stylesheet" href="style.css?v=1.2.0">
 </head>
 <body>
   <section id="tela-abertura" class="tela-abertura" aria-label="Abertura do Tinhas Gestão">
@@ -37,12 +37,12 @@
         <img src="assets/casal-login.png" alt="Equipe Tinhas Decorações: marcenaria e marketing">
       </div>
       <form id="form-login" class="form-login" autocomplete="on">
-        <label class="campo-login"><span>✉️</span><input id="email" type="email" placeholder="E-mail autorizado" autocomplete="username" required></label>
+        <label class="campo-login"><span>👤</span><input id="usuario" type="text" placeholder="Nome de usuário" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>
         <label class="campo-login"><span>🔒</span><input id="senha" type="password" placeholder="Senha do aplicativo" autocomplete="current-password" required></label>
         <button id="btn-login" class="botao-principal" type="submit">Entrar</button>
         <p id="mensagem-login" class="mensagem" role="status"></p>
       </form>
-<p class="rodape-login">Tinhas Decorações LTDA <span>•</span> v.1.1.4</p>
+<p class="rodape-login">Tinhas Decorações LTDA <span>•</span> v.1.2.0</p>
     </div>
   </section>
 
@@ -110,7 +110,7 @@
 
   <div id="modal-root"></div>
   <div id="toast" class="toast escondido" role="status"></div>
-  <script src="config.js?v=1.1.4"></script>
-  <script src="app.js?v=1.1.4"></script>
+  <script src="config.js?v=1.2.0"></script>
+  <script src="app.js?v=1.2.0"></script>
 </body>
 </html>

@@ -423,3 +423,69 @@ html,body{overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch}#te
 #form-alterar-senha .form-grupo.full, #form-alterar-senha .form-acoes.full { grid-column: 1 / -1; }
 #form-alterar-senha .campo-form { width:100%; box-sizing:border-box; }
 #form-alterar-senha .form-acoes { margin-top:8px; }
+
+
+/* V1.2.0 — rolagem independente e contínua na Home e nos módulos */
+html, body {
+  width:100%;
+  min-height:100%;
+  height:auto !important;
+  overflow-x:hidden !important;
+  overflow-y:auto !important;
+}
+body { max-width:520px; margin:0 auto; }
+#tela-home, #tela-modulo {
+  position:fixed !important;
+  top:0;
+  bottom:0;
+  left:50%;
+  transform:translateX(-50%);
+  width:min(100vw, 520px);
+  height:100vh;
+  height:100dvh;
+  min-height:0 !important;
+  max-height:none !important;
+  padding-bottom:0;
+  overflow-x:hidden !important;
+  overflow-y:auto !important;
+  overscroll-behavior-y:contain;
+  -webkit-overflow-scrolling:touch;
+  touch-action:pan-y;
+  scrollbar-gutter:stable;
+}
+#tela-home .topo, #tela-modulo .topo { position:sticky; top:0; z-index:50; }
+#tela-home .conteudo-home, #tela-modulo .conteudo-modulo {
+  height:auto !important;
+  min-height:0 !important;
+  max-height:none !important;
+  overflow:visible !important;
+  padding-bottom:calc(58px + env(safe-area-inset-bottom));
+}
+
+/* Configurações: perfil e gerenciamento da equipe */
+.cartao-configuracoes {
+  background:#fff;
+  border:1px solid #111;
+  border-radius:16px;
+  padding:15px;
+  margin:12px 0;
+  color:#17120f;
+  box-shadow:0 4px 14px rgba(0,0,0,.07);
+}
+.perfil-config { display:flex;align-items:center;gap:12px;margin-bottom:15px; }
+.perfil-config .icone-grande { flex:0 0 48px;width:48px;height:48px; }
+.perfil-config strong { display:block;font-size:16px; }
+.perfil-login { font-size:13px;color:#66584d;margin:3px 0; }
+.perfil-config small { color:#8a7765;font-size:11px; }
+.cartao-configuracoes h3 { margin:9px 0;color:#17120f;font-size:16px; }
+.config-ajuda { font-size:12px;color:#66584d;line-height:1.45;margin:0 0 13px; }
+.titulo-criar-usuario { margin-top:19px !important;padding-top:13px;border-top:1px solid #eadfd6; }
+.lista-usuarios-config { display:flex;flex-direction:column;gap:7px;margin:10px 0 15px; }
+.usuario-config-item { display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px;background:#fff6ef;border:1px solid #edd2bd;border-radius:11px; }
+.usuario-config-item strong { display:block;font-size:13px;color:#17120f; }
+.usuario-config-item small { display:block;font-size:11px;color:#725c4a;margin-top:3px; }
+.usuario-situacao { flex:0 0 auto;padding:4px 8px;border-radius:999px;font-size:10px;font-weight:800; }
+.usuario-situacao.ativo { background:#d9f1df;color:#17652b; }
+.usuario-situacao.inativo { background:#f6dada;color:#8e2020; }
+.ajuda-campo { color:#78695f;font-size:10px;line-height:1.35; }
+#form-criar-usuario .campo-form, #form-alterar-senha .campo-form { width:100%;box-sizing:border-box; }
