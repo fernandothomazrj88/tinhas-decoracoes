@@ -1,6 +1,6 @@
 'use strict';
 
-const TINHAS_VERSION = (window.TINHAS_CONFIG && window.TINHAS_CONFIG.APP_VERSION) || '1.4.0';
+const TINHAS_VERSION = (window.TINHAS_CONFIG && window.TINHAS_CONFIG.APP_VERSION) || '1.5.0';
 const STORAGE_TOKEN = 'tinhas_gestao_token';
 const STORAGE_USER = 'tinhas_gestao_usuario';
 const STATUS_PRODUCAO = ['Aguardando material', 'Em produção', 'Acabamento', 'Pronto', 'Entregue', 'Cancelado'];
@@ -330,6 +330,7 @@ async function abrirModulo(nome) {
     else if (nome === 'producao') await renderProducao(area);
     else if (nome === 'materiais') await renderMateriais(area);
     else if (nome === 'estoque') await renderEstoque(area);
+    else if (nome === 'financeiro') await renderFinanceiro(area);
     else if (nome === 'configuracoes') await renderConfiguracoes(area);
     else renderModuloEmPreparacao(area, nome);
   } catch (error) {
@@ -748,6 +749,207 @@ function abrirFormularioMovimentacaoEstoque(tipoInicial = 'ENTRADA', materialIni
       botao.disabled = false; botao.textContent = 'Registrar movimentação';
     }
   });
+}
+
+
+
+/* =====================================================
+   FINANCEIRO — RECEITAS, DESPESAS E FLUXO DO PERÍODO
+===================================================== */
+let lancamentosFinanceirosCache = [];
+
+function dataHojeISOFinanceiro() {
+  const agora = new Date();
+  return `${agora.getFullYear()}-${String(agora.getMonth()+1).padStart(2,'0')}-${String(agora.getDate()).padStart(2,'0')}`;
+}
+function statusFinanceiroDerivado(item) {
+  const status = String(item.status || '').toUpperCase();
+  const pendente = ['A_PAGAR','A_RECEBER'].includes(status);
+  if (!pendente || !item.data) return status;
+  const hoje = dataHojeISOFinanceiro();
+  return String(item.data).slice(0,10) < hoje ? 'ATRASADO' : status;
+}
+function statusFinanceiroLabel(status) {
+  return ({A_PAGAR:'A pagar',A_RECEBER:'A receber',PAGO:'Pago',RECEBIDO:'Recebido',ATRASADO:'Atrasado'})[status] || status;
+}
+function valorFinanceiroNoPeriodo(item, periodo) {
+  return !periodo || String(item.data || '').slice(0,7) === periodo;
+}
+async function renderFinanceiro(area) {
+  const config = MODULOS.financeiro;
+  const mesAtual = dataHojeISOFinanceiro().slice(0,7);
+  area.innerHTML = cabecalhoModulo(config) + `
+    <div class="financeiro-resumo">
+      <div class="financeiro-kpi receita"><small>Receitas recebidas</small><strong id="fin-kpi-receitas">—</strong></div>
+      <div class="financeiro-kpi despesa"><small>Despesas pagas</small><strong id="fin-kpi-despesas">—</strong></div>
+      <div class="financeiro-kpi resultado"><small>Resultado do período</small><strong id="fin-kpi-resultado">—</strong></div>
+    </div>
+    <div class="financeiro-abertos" id="fin-abertos">A receber: — · A pagar: — · Em atraso: —</div>
+    <div class="barra-acoes financeiro-acoes">
+      <button id="fin-nova-receita" class="botao-acao destaque">＋ Receita</button>
+      <button id="fin-nova-despesa" class="botao-acao financeiro-despesa-btn">＋ Despesa</button>
+      <button id="fin-atualizar" class="botao-acao" title="Atualizar">↻</button>
+    </div>
+    <div class="financeiro-filtros">
+      <input id="fin-busca" class="campo-busca" type="search" placeholder="Buscar descrição, categoria ou referência">
+      <select id="fin-periodo" class="campo-filtro" aria-label="Período"><option value="${mesAtual}">Mês atual</option><option value="todos">Todo o período</option><option value="especifico">Escolher mês…</option></select>
+      <input id="fin-mes-especifico" class="campo-form financeiro-mes escondido" type="month" value="${mesAtual}" aria-label="Escolher mês">
+      <select id="fin-tipo-filtro" class="campo-filtro" aria-label="Tipo"><option value="Todos">Receitas e despesas</option><option value="RECEITA">Receitas</option><option value="DESPESA">Despesas</option></select>
+      <select id="fin-status-filtro" class="campo-filtro" aria-label="Situação"><option value="Todos">Todas as situações</option><option value="ABERTOS">Em aberto</option><option value="CONCLUIDOS">Concluídos</option><option value="ATRASADOS">Atrasados</option></select>
+    </div>
+    <div id="fin-status-carregamento" class="status">Consultando lançamentos financeiros...</div>
+    <div id="fin-lista-lancamentos" class="lista-registros"></div>
+    <div class="aviso-modulo financeiro-aviso"><strong>Controle financeiro:</strong> receitas e despesas ficam registradas na aba FINANCEIRO. Use “Dar baixa” quando o valor for efetivamente recebido ou pago. O campo referência pode guardar o número de um pedido ou cliente, sem criar lançamentos duplicados automaticamente.</div>`;
+  $('fin-nova-receita').addEventListener('click', () => abrirFormularioLancamentoFinanceiro(null,'RECEITA'));
+  $('fin-nova-despesa').addEventListener('click', () => abrirFormularioLancamentoFinanceiro(null,'DESPESA'));
+  $('fin-atualizar').addEventListener('click', atualizarFinanceiroTela);
+  $('fin-busca').addEventListener('input', renderListaFinanceiro);
+  $('fin-periodo').addEventListener('change', () => {
+    $('fin-mes-especifico').classList.toggle('escondido', $('fin-periodo').value !== 'especifico');
+    atualizarResumoFinanceiro(); renderListaFinanceiro();
+  });
+  $('fin-mes-especifico').addEventListener('change', () => { atualizarResumoFinanceiro(); renderListaFinanceiro(); });
+  $('fin-tipo-filtro').addEventListener('change', renderListaFinanceiro);
+  $('fin-status-filtro').addEventListener('change', renderListaFinanceiro);
+  await atualizarFinanceiroTela();
+}
+
+function periodoFinanceiroSelecionado() {
+  const modo = $('fin-periodo')?.value || 'todos';
+  if (modo === 'todos') return '';
+  if (modo === 'especifico') return $('fin-mes-especifico')?.value || dataHojeISOFinanceiro().slice(0,7);
+  return modo;
+}
+
+async function atualizarFinanceiroTela() {
+  const status = $('fin-status-carregamento');
+  if (status) { status.className = 'status'; status.textContent = 'Atualizando lançamentos...'; }
+  try {
+    const result = await chamarApi({action:'listarLancamentosFinanceiros'});
+    lancamentosFinanceirosCache = result.dados.lancamentos || [];
+    atualizarResumoFinanceiro();
+    renderListaFinanceiro();
+    if (status) { status.className = 'status ok'; status.textContent = `${lancamentosFinanceirosCache.length} lançamento(s) financeiro(s) registrado(s).`; }
+  } catch (error) {
+    if (status) { status.className = 'status error'; status.textContent = error.message || 'Não foi possível carregar o financeiro.'; }
+    ['fin-kpi-receitas','fin-kpi-despesas','fin-kpi-resultado'].forEach(id => { if ($(id)) $(id).textContent = '—'; });
+    if ($('fin-lista-lancamentos')) $('fin-lista-lancamentos').innerHTML = '<div class="vazio">Não foi possível consultar os lançamentos. Verifique a conexão e tente atualizar.</div>';
+  }
+}
+
+function atualizarResumoFinanceiro() {
+  const periodo = periodoFinanceiroSelecionado();
+  const dados = lancamentosFinanceirosCache.filter(item => valorFinanceiroNoPeriodo(item, periodo));
+  const receitas = dados.filter(x => x.tipo === 'RECEITA' && x.status === 'RECEBIDO').reduce((s,x) => s + Number(x.valor || 0),0);
+  const despesas = dados.filter(x => x.tipo === 'DESPESA' && x.status === 'PAGO').reduce((s,x) => s + Number(x.valor || 0),0);
+  const aReceber = dados.filter(x => x.tipo === 'RECEITA' && x.status === 'A_RECEBER').reduce((s,x) => s + Number(x.valor || 0),0);
+  const aPagar = dados.filter(x => x.tipo === 'DESPESA' && x.status === 'A_PAGAR').reduce((s,x) => s + Number(x.valor || 0),0);
+  const atrasados = dados.filter(x => statusFinanceiroDerivado(x) === 'ATRASADO').length;
+  $('fin-kpi-receitas').textContent = moeda(receitas);
+  $('fin-kpi-despesas').textContent = moeda(despesas);
+  $('fin-kpi-resultado').textContent = moeda(receitas - despesas);
+  $('fin-kpi-resultado').classList.toggle('negativo', receitas - despesas < 0);
+  $('fin-abertos').textContent = `A receber: ${moeda(aReceber)} · A pagar: ${moeda(aPagar)} · Em atraso: ${atrasados}`;
+}
+
+function renderListaFinanceiro() {
+  const alvo = $('fin-lista-lancamentos'); if (!alvo) return;
+  const termo = normalizarTexto($('fin-busca')?.value || '');
+  const periodo = periodoFinanceiroSelecionado();
+  const tipoFiltro = $('fin-tipo-filtro')?.value || 'Todos';
+  const statusFiltro = $('fin-status-filtro')?.value || 'Todos';
+  const lista = lancamentosFinanceirosCache.filter(item => {
+    const status = statusFinanceiroDerivado(item);
+    const texto = normalizarTexto([item.descricao,item.categoria,item.referencia_id,item.forma_pagamento,item.observacoes].join(' '));
+    const statusOk = statusFiltro === 'Todos' || (statusFiltro === 'ABERTOS' && ['A_PAGAR','A_RECEBER','ATRASADO'].includes(status)) || (statusFiltro === 'CONCLUIDOS' && ['PAGO','RECEBIDO'].includes(status)) || (statusFiltro === 'ATRASADOS' && status === 'ATRASADO');
+    return (!termo || texto.includes(termo)) && (!periodo || valorFinanceiroNoPeriodo(item, periodo)) && (tipoFiltro === 'Todos' || item.tipo === tipoFiltro) && statusOk;
+  });
+  alvo.innerHTML = lista.length ? lista.map(item => {
+    const receita = item.tipo === 'RECEITA';
+    const status = statusFinanceiroDerivado(item);
+    const valor = `${receita ? '+' : '−'} ${moeda(item.valor)}`;
+    const badgeClasse = status === 'ATRASADO' ? 'atrasado' : (status === 'PAGO' || status === 'RECEBIDO' ? 'aprovado' : 'aguardando');
+    const podeDarBaixa = receita ? status === 'A_RECEBER' || status === 'ATRASADO' : status === 'A_PAGAR' || status === 'ATRASADO';
+    const subtitulo = [item.categoria,dataBR(item.data),item.referencia_id ? `Ref. ${item.referencia_id}` : ''].filter(Boolean).join(' · ');
+    return `<article class="registro financeiro-registro ${receita ? 'fin-receita' : 'fin-despesa'}">
+      <div class="registro-topo"><div><h3>${esc(item.descricao)}</h3><div class="meta">${esc(subtitulo)}</div><div class="meta">${esc(receita ? 'Receita' : 'Despesa')} · ${esc(item.forma_pagamento || 'Forma de pagamento não informada')}</div></div><div class="financeiro-valor ${receita ? 'positivo' : 'negativo'}">${esc(valor)}</div></div>
+      <div class="registro-acoes"><span class="badge-status ${badgeClasse}">${esc(statusFinanceiroLabel(status))}</span><span class="meta">${esc(item.id_lancamento)}</span></div>
+      ${item.observacoes ? `<div class="meta financeiro-observacoes">${esc(item.observacoes)}</div>` : ''}
+      <div class="registro-acoes"><button class="botao-acao" data-fin-editar="${esc(item.id_lancamento)}">Editar</button>${podeDarBaixa ? `<button class="botao-acao destaque" data-fin-baixa="${esc(item.id_lancamento)}">${receita ? 'Confirmar recebimento' : 'Marcar como pago'}</button>` : ''}</div>
+    </article>`;
+  }).join('') : '<div class="vazio">Nenhum lançamento encontrado neste filtro. Use “＋ Receita” ou “＋ Despesa” para registrar o primeiro movimento.</div>';
+  alvo.querySelectorAll('[data-fin-editar]').forEach(btn => btn.addEventListener('click', () => {
+    const item = lancamentosFinanceirosCache.find(x => String(x.id_lancamento) === btn.dataset.finEditar);
+    if (item) abrirFormularioLancamentoFinanceiro(item);
+  }));
+  alvo.querySelectorAll('[data-fin-baixa]').forEach(btn => btn.addEventListener('click', () => darBaixaFinanceiro(btn.dataset.finBaixa)));
+}
+
+function abrirFormularioLancamentoFinanceiro(item = null, tipoInicial = 'RECEITA') {
+  const editar = !!item;
+  const tipo = item ? item.tipo : tipoInicial;
+  const statusPadrao = tipo === 'RECEITA' ? 'A_RECEBER' : 'A_PAGAR';
+  const statusAtual = item?.status || statusPadrao;
+  const categoriasReceita = ['Venda de produto','Sinal de cliente','Recebimento de pedido','Serviço','Outras receitas'];
+  const categoriasDespesa = ['Compra de materiais','Ferramentas e equipamentos','Frete e entrega','Manutenção','Energia e água','Internet e telefone','Aluguel','Taxas e tarifas','Marketing','Embalagens','Outras despesas'];
+  abrirModal(editar ? 'Editar lançamento financeiro' : (tipo === 'RECEITA' ? 'Nova receita' : 'Nova despesa'), `
+    <form id="form-lancamento-financeiro" class="form-grid">
+      <div class="form-grupo"><label for="fin-form-tipo">Tipo *</label><select id="fin-form-tipo" class="campo-form" name="tipo"><option value="RECEITA" ${tipo==='RECEITA'?'selected':''}>Receita</option><option value="DESPESA" ${tipo==='DESPESA'?'selected':''}>Despesa</option></select></div>
+      <div class="form-grupo"><label for="fin-form-data">Data / vencimento *</label><input id="fin-form-data" class="campo-form" type="date" name="data" required value="${esc(item?.data || dataHojeISOFinanceiro())}"></div>
+      <div class="form-grupo full"><label for="fin-form-descricao">Descrição *</label><input id="fin-form-descricao" class="campo-form" name="descricao" maxlength="180" required placeholder="Ex.: Compra de madeira para pedido" value="${esc(item?.descricao || '')}"></div>
+      <div class="form-grupo"><label for="fin-form-categoria">Categoria *</label><input id="fin-form-categoria" class="campo-form" name="categoria" list="fin-categorias" maxlength="80" required placeholder="Selecione ou digite" value="${esc(item?.categoria || '')}"><datalist id="fin-categorias">${[...categoriasReceita,...categoriasDespesa].map(c => `<option value="${esc(c)}"></option>`).join('')}</datalist></div>
+      <div class="form-grupo"><label for="fin-form-valor">Valor (R$) *</label><input id="fin-form-valor" class="campo-form" type="number" name="valor" min="0.01" step="0.01" inputmode="decimal" required placeholder="0,00" value="${esc(item?.valor ?? '')}"></div>
+      <div class="form-grupo"><label for="fin-form-pagamento">Forma de pagamento</label><select id="fin-form-pagamento" class="campo-form" name="forma_pagamento"><option value="">Não informada</option>${['PIX','Dinheiro','Transferência bancária','Cartão de débito','Cartão de crédito','Boleto','Outro'].map(f => `<option value="${esc(f)}" ${item?.forma_pagamento===f?'selected':''}>${esc(f)}</option>`).join('')}</select></div>
+      <div class="form-grupo"><label for="fin-form-status">Situação *</label><select id="fin-form-status" class="campo-form" name="status"></select></div>
+      <div class="form-grupo full"><label for="fin-form-referencia">Referência (opcional)</label><input id="fin-form-referencia" class="campo-form" name="referencia_id" maxlength="80" placeholder="Ex.: número do pedido ou cliente" value="${esc(item?.referencia_id || '')}"></div>
+      <div class="form-grupo full"><label for="fin-form-observacoes">Observações</label><textarea id="fin-form-observacoes" class="campo-form textarea" name="observacoes" maxlength="500" placeholder="Detalhes adicionais">${esc(item?.observacoes || '')}</textarea></div>
+      <div class="form-grupo full"><div id="erro-fin-form" class="mensagem"></div></div>
+      <div class="form-grupo full form-acoes"><button type="button" class="botao-acao" data-fechar-modal>Cancelar</button><button type="submit" class="botao-acao destaque">${editar ? 'Salvar alterações' : 'Cadastrar lançamento'}</button></div>
+    </form>`);
+  const form = $('form-lancamento-financeiro');
+  const selectTipo = $('fin-form-tipo');
+  const selectStatus = $('fin-form-status');
+  function atualizarStatusFinanceiro(selecionado) {
+    const isReceita = selectTipo.value === 'RECEITA';
+    const opcoes = isReceita ? [['A_RECEBER','A receber'],['RECEBIDO','Recebido']] : [['A_PAGAR','A pagar'],['PAGO','Pago']];
+    selectStatus.innerHTML = opcoes.map(([v,l]) => `<option value="${v}" ${v===selecionado?'selected':''}>${l}</option>`).join('');
+  }
+  atualizarStatusFinanceiro(statusAtual);
+  selectTipo.addEventListener('change', () => atualizarStatusFinanceiro(selectTipo.value === 'RECEITA' ? 'A_RECEBER' : 'A_PAGAR'));
+  form.querySelector('[data-fechar-modal]').addEventListener('click', fecharModal);
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    const dados = Object.fromEntries(new FormData(form).entries());
+    dados.valor = Number(dados.valor);
+    const botao = form.querySelector('[type=submit]');
+    const erro = $('erro-fin-form');
+    erro.textContent = '';
+    botao.disabled = true; botao.textContent = 'Salvando...';
+    try {
+      const result = editar
+        ? await chamarApi({action:'atualizarLancamentoFinanceiro',id_lancamento:item.id_lancamento,lancamento:dados})
+        : await chamarApi({action:'cadastrarLancamentoFinanceiro',lancamento:dados});
+      fecharModal(); toast(result.dados?.mensagem || 'Lançamento salvo.'); await atualizarFinanceiroTela();
+    } catch (error) {
+      erro.textContent = error.message || 'Não foi possível salvar o lançamento.';
+      botao.disabled = false; botao.textContent = editar ? 'Salvar alterações' : 'Cadastrar lançamento';
+    }
+  });
+}
+
+async function darBaixaFinanceiro(id) {
+  const item = lancamentosFinanceirosCache.find(x => String(x.id_lancamento) === String(id));
+  if (!item) return;
+  const status = item.tipo === 'RECEITA' ? 'RECEBIDO' : 'PAGO';
+  const confirmacao = item.tipo === 'RECEITA'
+    ? `Confirmar que a receita “${item.descricao}” foi recebida?`
+    : `Confirmar que a despesa “${item.descricao}” foi paga?`;
+  if (!confirm(confirmacao)) return;
+  try {
+    const result = await chamarApi({action:'alterarStatusLancamentoFinanceiro',id_lancamento:id,status});
+    toast(result.dados?.mensagem || 'Situação atualizada.');
+    await atualizarFinanceiroTela();
+  } catch (error) { toast(error.message || 'Não foi possível atualizar a situação.'); }
 }
 
 function renderModuloEmPreparacao(area, nome) {

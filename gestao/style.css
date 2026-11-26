@@ -513,3 +513,26 @@ body { max-width:520px; margin:0 auto; }
 .estoque-aviso{margin-top:13px}
 .badge-status.entrada{background:#CBEBD1;color:#135D27}.badge-status.saida{background:#FFD4D1;color:#8A1C18}.badge-status.ajuste{background:#FFE0B9;color:#754000}
 @media(max-width:360px){.estoque-kpi{padding:8px 6px}.estoque-kpi small{font-size:9px}.estoque-kpi strong{font-size:15px}.estoque-registro .estoque-saldo{min-width:62px}.estoque-registro .estoque-saldo strong{font-size:19px}}
+
+
+
+/* FINANCEIRO — indicadores, filtros e lançamentos */
+.financeiro-resumo{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:0 0 8px}
+.financeiro-kpi{min-width:0;padding:10px 9px;border:1px solid #111;border-radius:12px;background:#fff;color:#111;box-shadow:0 3px 9px rgba(0,0,0,.08)}
+.financeiro-kpi small{display:block;font-size:10px;color:#63452f;line-height:1.2}
+.financeiro-kpi strong{display:block;margin-top:5px;font-size:14px;line-height:1.15;overflow-wrap:anywhere}
+.financeiro-kpi.receita{border-left:4px solid #238343}.financeiro-kpi.despesa{border-left:4px solid #bb3430}.financeiro-kpi.resultado{border-left:4px solid #ED7014}
+.financeiro-kpi .negativo{color:#b42318}
+.financeiro-abertos{font-size:11px;font-weight:700;color:#24180f;background:rgba(255,255,255,.42);border:1px solid rgba(0,0,0,.12);border-radius:9px;padding:8px 10px;margin:0 0 10px;line-height:1.4}
+.financeiro-acoes .botao-acao{flex:1;min-width:0}.financeiro-despesa-btn{background:#111!important;color:#fff!important;border-color:#111!important}
+.financeiro-filtros{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:8px 0}
+.financeiro-filtros .campo-busca{grid-column:1/-1;width:100%;min-width:0}
+.financeiro-filtros .campo-filtro,.financeiro-filtros .campo-form{width:100%;min-width:0}
+.financeiro-mes{font-size:12px;padding:8px}
+.financeiro-registro{border-left:4px solid #238343}.financeiro-registro.fin-despesa{border-left-color:#b8322c}
+.financeiro-valor{font-size:14px;font-weight:900;white-space:nowrap;text-align:right}
+.financeiro-valor.positivo{color:#78d99a}.financeiro-valor.negativo{color:#ff9a91}
+.financeiro-observacoes{margin-top:8px!important;padding-top:7px;border-top:1px solid #333}
+.badge-status.atrasado{background:#ffd7d4;color:#8b1711}
+.financeiro-aviso{margin-top:12px}
+@media(max-width:360px){.financeiro-kpi{padding:8px 6px}.financeiro-kpi small{font-size:9px}.financeiro-kpi strong{font-size:12px}.financeiro-valor{font-size:12px}.financeiro-filtros{gap:5px}}
