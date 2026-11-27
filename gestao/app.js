@@ -1,6 +1,6 @@
 'use strict';
 
-const TINHAS_VERSION = (window.TINHAS_CONFIG && window.TINHAS_CONFIG.APP_VERSION) || '1.6.0';
+const TINHAS_VERSION = (window.TINHAS_CONFIG && window.TINHAS_CONFIG.APP_VERSION) || '1.7.0';
 const STORAGE_TOKEN = 'tinhas_gestao_token';
 const STORAGE_USER = 'tinhas_gestao_usuario';
 const STATUS_PRODUCAO = ['Aguardando material', 'Em produção', 'Acabamento', 'Pronto', 'Entregue', 'Cancelado'];
@@ -15,6 +15,7 @@ let orcamentosCache = [];
 let pedidosCache = [];
 let materiaisCache = [];
 let agendaTarefasCache = [];
+let portfolioCache = [];
 let agendaMesAtual = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let agendaDiaSelecionado = null;
 let installPromptEvent = null;
@@ -335,6 +336,7 @@ async function abrirModulo(nome) {
     else if (nome === 'estoque') await renderEstoque(area);
     else if (nome === 'financeiro') await renderFinanceiro(area);
     else if (nome === 'agenda') await renderAgenda(area);
+    else if (nome === 'portfolio') await renderPortfolio(area);
     else if (nome === 'configuracoes') await renderConfiguracoes(area);
     else renderModuloEmPreparacao(area, nome);
   } catch (error) {
@@ -953,6 +955,180 @@ async function darBaixaFinanceiro(id) {
     const result = await chamarApi({action:'alterarStatusLancamentoFinanceiro',id_lancamento:id,status});
     toast(result.dados?.mensagem || 'Situação atualizada.');
     await atualizarFinanceiroTela();
+  } catch (error) { toast(error.message || 'Não foi possível atualizar a situação.'); }
+}
+
+
+/* =====================================================
+   PORTFÓLIO — PROJETOS REALIZADOS E VITRINE INTERNA
+   Usa a aba PORTFÓLIO existente; não publica automaticamente no site.
+===================================================== */
+function publicadoPortfolioUI(item) {
+  const valor = item?.publicado;
+  return valor === true || ['true','sim','1','publicado'].includes(String(valor || '').toLowerCase().trim());
+}
+function statusPortfolioUI(item) {
+  const status = String(item?.status || (publicadoPortfolioUI(item) ? 'PUBLICADO' : 'RASCUNHO')).trim().toUpperCase();
+  if (['PUBLICADO','PUBLICADA','PUBLICADO NO SITE'].includes(status) || publicadoPortfolioUI(item)) return 'PUBLICADO';
+  if (['ARQUIVADO','ARQUIVADA','ARQUIVO'].includes(status)) return 'ARQUIVADO';
+  return 'RASCUNHO';
+}
+function imagemPortfolioUI(url) {
+  const valor = String(url || '').trim();
+  if (!/^https?:\/\//i.test(valor)) return '';
+  const drive = valor.match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?(?:[^#]*&)?id=)([a-zA-Z0-9_-]+)/i);
+  return drive ? `https://drive.google.com/uc?export=view&id=${drive[1]}` : valor;
+}
+async function renderPortfolio(area) {
+  const config = MODULOS.portfolio;
+  area.innerHTML = cabecalhoModulo(config) + `
+    <section class="portfolio-resumo">
+      <div class="portfolio-kpi"><small>Projetos cadastrados</small><strong id="portfolio-kpi-total">—</strong></div>
+      <div class="portfolio-kpi publicado"><small>Marcados como publicados</small><strong id="portfolio-kpi-publicados">—</strong></div>
+      <div class="portfolio-kpi rascunho"><small>Em preparação</small><strong id="portfolio-kpi-rascunhos">—</strong></div>
+    </section>
+    <div class="barra-acoes portfolio-acoes">
+      <button type="button" id="portfolio-novo" class="botao-acao destaque">＋ Novo projeto</button>
+      <button type="button" id="portfolio-atualizar" class="botao-acao" title="Atualizar portfólio">↻ Atualizar</button>
+    </div>
+    <div class="portfolio-filtros">
+      <input id="portfolio-busca" class="campo-busca" type="search" placeholder="Buscar título, categoria, ambiente ou descrição">
+      <select id="portfolio-filtro-status" class="campo-filtro" aria-label="Filtrar portfólio">
+        <option value="TODOS">Todos os projetos</option><option value="PUBLICADO">Marcados como publicados</option><option value="RASCUNHO">Rascunhos</option><option value="ARQUIVADO">Arquivados</option>
+      </select>
+      <select id="portfolio-filtro-categoria" class="campo-filtro" aria-label="Filtrar categoria"><option value="TODAS">Todas as categorias</option></select>
+    </div>
+    <div id="portfolio-status-carregamento" class="status">Carregando portfólio...</div>
+    <div id="portfolio-lista" class="portfolio-grid"></div>
+    <div class="aviso-modulo portfolio-aviso"><strong>Organização do portfólio:</strong> cadastre aqui projetos realizados, imagens e informações das peças. “Marcado como publicado” atualiza o campo de publicação na planilha, mas não envia imagens automaticamente ao site público. Para exibir uma foto, use um link de imagem ou um link público do Google Drive.</div>`;
+  $('portfolio-novo').addEventListener('click', () => abrirFormularioPortfolio());
+  $('portfolio-atualizar').addEventListener('click', atualizarPortfolioTela);
+  $('portfolio-busca').addEventListener('input', renderListaPortfolio);
+  $('portfolio-filtro-status').addEventListener('change', renderListaPortfolio);
+  $('portfolio-filtro-categoria').addEventListener('change', renderListaPortfolio);
+  await atualizarPortfolioTela();
+}
+async function atualizarPortfolioTela() {
+  const status = $('portfolio-status-carregamento');
+  if (!status) return;
+  status.className = 'status'; status.textContent = 'Consultando projetos...';
+  try {
+    const result = await chamarApi({action:'listarPortfolio'});
+    portfolioCache = result.dados.portfolio || [];
+    const categorias = [...new Set(portfolioCache.map(p => String(p.categoria || '').trim()).filter(Boolean))].sort((a,b) => a.localeCompare(b,'pt-BR'));
+    const filtro = $('portfolio-filtro-categoria');
+    const anterior = filtro.value || 'TODAS';
+    filtro.innerHTML = '<option value="TODAS">Todas as categorias</option>' + categorias.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+    filtro.value = categorias.includes(anterior) ? anterior : 'TODAS';
+    const publicados = portfolioCache.filter(p => statusPortfolioUI(p) === 'PUBLICADO').length;
+    const rascunhos = portfolioCache.filter(p => statusPortfolioUI(p) === 'RASCUNHO').length;
+    $('portfolio-kpi-total').textContent = portfolioCache.length;
+    $('portfolio-kpi-publicados').textContent = publicados;
+    $('portfolio-kpi-rascunhos').textContent = rascunhos;
+    status.className = 'status ok'; status.textContent = `${portfolioCache.length} projeto(s) cadastrado(s) na aba PORTFÓLIO.`;
+    renderListaPortfolio();
+  } catch (error) {
+    status.className = 'status error'; status.textContent = error.message || 'Não foi possível carregar o portfólio.';
+    $('portfolio-lista').innerHTML = '<div class="vazio">Não foi possível consultar os projetos. Verifique a conexão e tente atualizar.</div>';
+  }
+}
+function renderListaPortfolio() {
+  const alvo = $('portfolio-lista'); if (!alvo) return;
+  const termo = normalizarTexto($('portfolio-busca')?.value || '');
+  const statusFiltro = $('portfolio-filtro-status')?.value || 'TODOS';
+  const categoriaFiltro = $('portfolio-filtro-categoria')?.value || 'TODAS';
+  const lista = portfolioCache.filter(p => {
+    const texto = normalizarTexto([p.titulo,p.categoria,p.ambiente,p.descricao,p.id_projeto,p.id_portfolio].join(' '));
+    const status = statusPortfolioUI(p);
+    return (!termo || texto.includes(termo)) && (statusFiltro === 'TODOS' || status === statusFiltro) && (categoriaFiltro === 'TODAS' || String(p.categoria || '') === categoriaFiltro);
+  }).sort((a,b) => Number(a.ordem || 0) - Number(b.ordem || 0) || String(b.atualizado_em || b.criado_em || '').localeCompare(String(a.atualizado_em || a.criado_em || '')));
+  alvo.innerHTML = lista.length ? lista.map(p => {
+    const status = statusPortfolioUI(p);
+    const foto = imagemPortfolioUI(p.foto_capa);
+    const meta = [p.categoria,p.ambiente].filter(Boolean).join(' • ');
+    const galeria = String(p.galeria_url || '').split(/[\n;,]+/).map(x => x.trim()).filter(Boolean).length;
+    return `<article class="portfolio-card">
+      <div class="portfolio-capa ${foto ? '' : 'sem-imagem'}"><span>🖼️</span>${foto ? `<img src="${esc(foto)}" alt="Capa de ${esc(p.titulo || 'projeto')}" loading="lazy">` : ''}<span class="portfolio-selo">${status === 'PUBLICADO' ? 'Publicado' : (status === 'ARQUIVADO' ? 'Arquivado' : 'Rascunho')}</span></div>
+      <div class="portfolio-card-corpo"><div class="portfolio-card-topo"><h3>${esc(p.titulo || 'Projeto sem título')}</h3>${badge(status === 'PUBLICADO' ? 'Publicado' : (status === 'ARQUIVADO' ? 'Arquivado' : 'Rascunho'))}</div>
+        <div class="meta">${esc(meta || 'Categoria/ambiente não informado')}</div>
+        ${p.id_projeto ? `<div class="meta">Projeto vinculado: ${esc(p.id_projeto)}</div>` : ''}
+        ${p.descricao ? `<p class="portfolio-descricao">${esc(p.descricao)}</p>` : ''}
+        <div class="portfolio-card-info"><span>${galeria} foto(s) na galeria</span><span>Ordem ${Number(p.ordem || 0)}</span></div>
+        <div class="registro-acoes"><button type="button" class="botao-acao" data-portfolio-galeria="${esc(p.id_portfolio)}">Ver fotos (${galeria + (foto ? 1 : 0)})</button><button type="button" class="botao-acao destaque" data-portfolio-editar="${esc(p.id_portfolio)}">Editar</button>${status === 'PUBLICADO' ? `<button type="button" class="botao-acao" data-portfolio-status="${esc(p.id_portfolio)}" data-status="RASCUNHO">Retirar publicação</button>` : (status === 'ARQUIVADO' ? `<button type="button" class="botao-acao" data-portfolio-status="${esc(p.id_portfolio)}" data-status="RASCUNHO">Reativar</button>` : `<button type="button" class="botao-acao" data-portfolio-status="${esc(p.id_portfolio)}" data-status="PUBLICADO">Marcar publicado</button>`)}${status !== 'ARQUIVADO' ? `<button type="button" class="botao-acao" data-portfolio-status="${esc(p.id_portfolio)}" data-status="ARQUIVADO">Arquivar</button>` : ''}</div>
+      </div></article>`;
+  }).join('') : '<div class="vazio portfolio-vazio">Nenhum projeto encontrado. Use “＋ Novo projeto” para cadastrar o primeiro trabalho da Tinhas.</div>';
+  alvo.querySelectorAll('img').forEach(img => img.addEventListener('error', () => { img.remove(); img.parentElement.classList.add('sem-imagem'); }));
+  alvo.querySelectorAll('[data-portfolio-editar]').forEach(btn => btn.addEventListener('click', () => {
+    const item = portfolioCache.find(p => String(p.id_portfolio) === btn.dataset.portfolioEditar); if (item) abrirFormularioPortfolio(item);
+  }));
+  alvo.querySelectorAll('[data-portfolio-status]').forEach(btn => btn.addEventListener('click', () => alterarStatusPortfolioTela(btn.dataset.portfolioStatus, btn.dataset.status)));
+  alvo.querySelectorAll('[data-portfolio-galeria]').forEach(btn => btn.addEventListener('click', () => {
+    const item = portfolioCache.find(p => String(p.id_portfolio) === btn.dataset.portfolioGaleria); if (item) abrirGaleriaPortfolio(item);
+  }));
+}
+function abrirGaleriaPortfolio(item) {
+  const urls = [item.foto_capa, ...String(item.galeria_url || '').split(/[\n;,]+/)].map(x => imagemPortfolioUI(x)).filter(Boolean);
+  abrirModal(`Fotos — ${item.titulo || 'Projeto'}`, urls.length ? `<div class="portfolio-galeria-modal">${urls.map((url,i) => `<figure><img src="${esc(url)}" alt="Foto ${i+1} de ${esc(item.titulo || 'projeto')}" loading="lazy"><figcaption>${i === 0 && item.foto_capa ? 'Foto de capa' : `Foto ${i+1}`}</figcaption></figure>`).join('')}</div><div class="form-acoes"><button type="button" class="botao-acao" data-fechar-modal>Fechar</button></div>` : '<div class="vazio">Este projeto ainda não tem fotos cadastradas.</div>');
+  $('modal-root').querySelector('[data-fechar-modal]')?.addEventListener('click', fecharModal);
+  $('modal-root').querySelectorAll('img').forEach(img => img.addEventListener('error', () => { img.parentElement.classList.add('imagem-indisponivel'); img.alt = 'Imagem indisponível — confira o compartilhamento do link'; }));
+}
+function abrirFormularioPortfolio(item = null) {
+  const editar = !!item;
+  const categorias = ['Móveis','Decoração','Home office','Sala','Quarto','Cozinha','Quadros decorativos','Floreiras','Bancos e mesas','Outros'];
+  const ambientes = ['Sala','Quarto','Cozinha','Home office','Varanda','Área externa','Comercial','Outro'];
+  const statusAtual = statusPortfolioUI(item || {});
+  const opcoes = (valores, atual) => valores.map(v => `<option value="${esc(v)}" ${String(v).toUpperCase() === String(atual || '').toUpperCase() ? 'selected' : ''}>${esc(v)}</option>`).join('');
+  const url = imagemPortfolioUI(item?.foto_capa || '');
+  abrirModal(editar ? 'Editar projeto do portfólio' : 'Cadastrar projeto no portfólio', `
+    <form id="form-portfolio" class="form-grid">
+      <div class="form-grupo full"><label for="portfolio-titulo">Título do projeto *</label><input id="portfolio-titulo" class="campo-form" name="titulo" maxlength="140" required placeholder="Ex.: Aparador industrial em Pinus" value="${esc(item?.titulo || '')}"></div>
+      <div class="form-grupo"><label for="portfolio-categoria">Categoria *</label><input id="portfolio-categoria" class="campo-form" name="categoria" list="portfolio-categorias" required maxlength="80" placeholder="Ex.: Móveis" value="${esc(item?.categoria || '')}"><datalist id="portfolio-categorias">${categorias.map(c => `<option value="${esc(c)}"></option>`).join('')}</datalist></div>
+      <div class="form-grupo"><label for="portfolio-ambiente">Ambiente</label><input id="portfolio-ambiente" class="campo-form" name="ambiente" list="portfolio-ambientes" maxlength="80" placeholder="Ex.: Home office" value="${esc(item?.ambiente || '')}"><datalist id="portfolio-ambientes">${ambientes.map(c => `<option value="${esc(c)}"></option>`).join('')}</datalist></div>
+      <div class="form-grupo full"><label for="portfolio-descricao">Descrição</label><textarea id="portfolio-descricao" class="campo-form textarea" name="descricao" maxlength="2000" placeholder="Conte sobre a peça, acabamento, dimensões e detalhes do projeto...">${esc(item?.descricao || '')}</textarea></div>
+      <div class="form-grupo full"><label for="portfolio-id-projeto">ID do projeto relacionado (opcional)</label><input id="portfolio-id-projeto" class="campo-form" name="id_projeto" maxlength="60" value="${esc(item?.id_projeto || '')}" placeholder="Ex.: PRO-0001"><small class="ajuda-campo">Use o código da aba PROJETOS quando quiser relacionar este registro a um projeto existente.</small></div>
+      <div class="form-grupo full"><label for="portfolio-foto-capa">Link da foto de capa</label><input id="portfolio-foto-capa" class="campo-form" type="url" name="foto_capa" maxlength="1000" value="${esc(item?.foto_capa || '')}" placeholder="https://..."><small class="ajuda-campo">Aceita link direto de imagem ou link público do Google Drive. No Drive, permita acesso a qualquer pessoa com o link.</small><div id="portfolio-preview-capa" class="portfolio-preview ${url ? '' : 'escondido'}">${url ? `<img src="${esc(url)}" alt="Prévia da capa">` : ''}</div></div>
+      <div class="form-grupo full"><label for="portfolio-galeria">Links da galeria (um por linha)</label><textarea id="portfolio-galeria" class="campo-form textarea" name="galeria_url" maxlength="6000" placeholder="https://imagem1.jpg&#10;https://imagem2.jpg">${esc(item?.galeria_url || '')}</textarea><small class="ajuda-campo">Informe até 12 links de imagens, um por linha. O aplicativo salva os links na coluna galeria_url.</small></div>
+      <div class="form-grupo"><label for="portfolio-status">Situação</label><select id="portfolio-status" class="campo-form" name="status">${opcoes(['RASCUNHO','PUBLICADO','ARQUIVADO'],statusAtual)}</select></div>
+      <div class="form-grupo"><label for="portfolio-ordem">Ordem de exibição</label><input id="portfolio-ordem" class="campo-form" type="number" name="ordem" min="0" max="9999" step="1" value="${esc(item?.ordem ?? 0)}"></div>
+      <p id="portfolio-erro-form" class="mensagem full" role="alert"></p>
+      <div class="form-acoes full"><button type="button" class="botao-acao" data-fechar-modal>Cancelar</button><button type="submit" class="botao-acao destaque">${editar ? 'Salvar alterações' : 'Cadastrar projeto'}</button></div>
+    </form>`);
+  $('form-portfolio').querySelector('[data-fechar-modal]').addEventListener('click', fecharModal);
+  const capaInput = $('portfolio-foto-capa');
+  capaInput.addEventListener('input', () => {
+    const preview = $('portfolio-preview-capa'); const src = imagemPortfolioUI(capaInput.value);
+    preview.classList.toggle('escondido', !src);
+    preview.innerHTML = src ? `<img src="${esc(src)}" alt="Prévia da capa">` : '';
+    preview.querySelector('img')?.addEventListener('error', () => { preview.innerHTML = '<span>Não foi possível carregar esta imagem. Confira o link e a permissão de compartilhamento.</span>'; });
+  });
+  $('form-portfolio').addEventListener('submit', async event => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const dados = Object.fromEntries(new FormData(form).entries());
+    dados.ordem = Number(dados.ordem || 0);
+    dados.galeria_url = String(dados.galeria_url || '').split(/[\n;,]+/).map(x => x.trim()).filter(Boolean).join('\n');
+    const urls = [dados.foto_capa, ...dados.galeria_url.split('\n').filter(Boolean)].filter(Boolean);
+    if (urls.length > 13) { $('portfolio-erro-form').textContent = 'Use no máximo uma foto de capa e 12 fotos na galeria.'; return; }
+    if (urls.some(u => !/^https?:\/\//i.test(u))) { $('portfolio-erro-form').textContent = 'Cada imagem precisa ter um link iniciado por http:// ou https://.'; return; }
+    const botao = form.querySelector('[type="submit"]'); botao.disabled = true; botao.textContent = 'Salvando...';
+    try {
+      const result = editar
+        ? await chamarApi({action:'atualizarPortfolio',id_portfolio:item.id_portfolio,portfolio:dados})
+        : await chamarApi({action:'cadastrarPortfolio',portfolio:dados});
+      fecharModal(); toast(result.dados?.mensagem || 'Projeto salvo no portfólio.'); await atualizarPortfolioTela();
+    } catch (error) {
+      $('portfolio-erro-form').textContent = error.message || 'Não foi possível salvar o projeto.';
+      botao.disabled = false; botao.textContent = editar ? 'Salvar alterações' : 'Cadastrar projeto';
+    }
+  });
+}
+async function alterarStatusPortfolioTela(id, status) {
+  const item = portfolioCache.find(p => String(p.id_portfolio) === String(id)); if (!item) return;
+  const mensagens = {PUBLICADO:'Marcar este projeto como publicado no portfólio?',RASCUNHO:'Retirar este projeto da situação publicado e voltar para rascunho?',ARQUIVADO:'Arquivar este projeto? Ele continuará salvo na planilha.'};
+  if (!confirm(mensagens[status] || 'Alterar situação do projeto?')) return;
+  try {
+    const result = await chamarApi({action:'alterarStatusPortfolio',id_portfolio:id,status});
+    toast(result.dados?.mensagem || 'Situação do projeto atualizada.'); await atualizarPortfolioTela();
   } catch (error) { toast(error.message || 'Não foi possível atualizar a situação.'); }
 }
 

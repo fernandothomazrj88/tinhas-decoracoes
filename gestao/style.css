@@ -579,3 +579,42 @@ body { max-width:520px; margin:0 auto; }
 .badge-status.pendente{background:#ffe7bf;color:#754500}.badge-status.em-andamento{background:#dceaff;color:#164c82}.badge-status.concluida{background:#d8f0df;color:#1d6632}.badge-status.cancelada{background:#e7e7e7;color:#555}.badge-status.atrasada{background:#ffd7d4;color:#8b1711}
 .agenda-aviso{margin-top:12px}
 @media(max-width:360px){.agenda-kpi{padding:8px 6px}.agenda-kpi small{font-size:9px}.agenda-kpi strong{font-size:16px}.agenda-dia{min-height:42px;font-size:11px}.agenda-lista-titulo h3{font-size:14px}.agenda-lista-titulo .botao-acao{padding:9px 9px;font-size:11px}}
+
+
+/* PORTFÓLIO — catálogo de projetos realizados */
+.portfolio-resumo{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:0 0 11px}
+.portfolio-kpi{min-width:0;padding:10px 9px;background:#fff;color:#111;border:1px solid #111;border-radius:12px;box-shadow:0 3px 9px rgba(0,0,0,.08)}
+.portfolio-kpi small{display:block;font-size:10px;color:#63452f;line-height:1.2}
+.portfolio-kpi strong{display:block;margin-top:5px;font-size:19px;line-height:1.1;overflow-wrap:anywhere}
+.portfolio-kpi.publicado{border-left:4px solid #238343}.portfolio-kpi.rascunho{border-left:4px solid #ED7014}
+.portfolio-acoes .botao-acao{flex:1}
+.portfolio-filtros{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:8px 0 11px}
+.portfolio-filtros .campo-busca{grid-column:1/-1;width:100%;min-width:0}
+.portfolio-filtros .campo-filtro{width:100%;min-width:0}
+.portfolio-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;align-items:stretch}
+.portfolio-card{min-width:0;overflow:hidden;background:#111;color:#fff;border:1px solid #000;border-radius:15px;box-shadow:0 4px 12px rgba(0,0,0,.12)}
+.portfolio-capa{position:relative;width:100%;aspect-ratio:4/3;overflow:hidden;background:#24150c;display:grid;place-items:center}
+.portfolio-capa>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.portfolio-capa>span:first-child{font-size:42px;filter:drop-shadow(0 2px 5px #000)}
+.portfolio-capa:not(.sem-imagem)>span:first-child{display:none}
+.portfolio-selo{position:absolute;right:7px;top:7px;padding:4px 7px;border-radius:20px;background:#ED7014;color:#111;font-size:9px;font-weight:900;z-index:2}
+.portfolio-card-corpo{padding:10px;min-width:0}
+.portfolio-card-topo{display:flex;align-items:flex-start;justify-content:space-between;gap:5px}
+.portfolio-card-topo h3{font-size:13px;line-height:1.2;overflow-wrap:anywhere}
+.portfolio-card-topo .badge-status{font-size:8px;padding:4px 6px;flex:0 0 auto}
+.portfolio-descricao{margin-top:7px;color:#ddd;font-size:10px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;white-space:pre-wrap;overflow-wrap:anywhere}
+.portfolio-card-info{display:flex;justify-content:space-between;gap:5px;margin-top:8px;padding-top:7px;border-top:1px solid #333;color:#cfcfcf;font-size:9px}
+.portfolio-card .registro-acoes{gap:5px}
+.portfolio-card .registro-acoes .botao-acao{flex:1;min-width:0;white-space:normal;padding:7px 6px;font-size:9px}
+.portfolio-preview{margin-top:7px;border:1px solid #d0b9a6;border-radius:10px;overflow:hidden;background:#191919;max-height:180px}
+.portfolio-preview img{width:100%;max-height:180px;object-fit:contain;display:block}
+.portfolio-preview span{display:block;padding:10px;color:#8c2118;font-size:11px}
+.portfolio-aviso{margin-top:12px}
+.portfolio-vazio{grid-column:1/-1}
+@media(max-width:360px){.portfolio-resumo{gap:5px}.portfolio-kpi{padding:8px 6px}.portfolio-kpi small{font-size:9px}.portfolio-kpi strong{font-size:16px}.portfolio-grid{gap:7px}.portfolio-card-corpo{padding:8px}.portfolio-card-topo h3{font-size:12px}.portfolio-card .registro-acoes .botao-acao{font-size:8px;padding:6px 4px}}
+
+.portfolio-galeria-modal{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.portfolio-galeria-modal figure{margin:0;min-width:0;background:#111;border:1px solid #111;border-radius:11px;overflow:hidden;color:#fff}
+.portfolio-galeria-modal img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;background:#24150c}
+.portfolio-galeria-modal figcaption{padding:6px 8px;font-size:10px;color:#eee}
+.portfolio-galeria-modal .imagem-indisponivel img{object-fit:contain;min-height:100px}
