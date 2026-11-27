@@ -1,6 +1,6 @@
 'use strict';
 
-const TINHAS_VERSION = (window.TINHAS_CONFIG && window.TINHAS_CONFIG.APP_VERSION) || '1.5.0';
+const TINHAS_VERSION = (window.TINHAS_CONFIG && window.TINHAS_CONFIG.APP_VERSION) || '1.6.0';
 const STORAGE_TOKEN = 'tinhas_gestao_token';
 const STORAGE_USER = 'tinhas_gestao_usuario';
 const STATUS_PRODUCAO = ['Aguardando material', 'Em produção', 'Acabamento', 'Pronto', 'Entregue', 'Cancelado'];
@@ -14,6 +14,9 @@ let clientesCache = [];
 let orcamentosCache = [];
 let pedidosCache = [];
 let materiaisCache = [];
+let agendaTarefasCache = [];
+let agendaMesAtual = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+let agendaDiaSelecionado = null;
 let installPromptEvent = null;
 
 const $ = id => document.getElementById(id);
@@ -331,6 +334,7 @@ async function abrirModulo(nome) {
     else if (nome === 'materiais') await renderMateriais(area);
     else if (nome === 'estoque') await renderEstoque(area);
     else if (nome === 'financeiro') await renderFinanceiro(area);
+    else if (nome === 'agenda') await renderAgenda(area);
     else if (nome === 'configuracoes') await renderConfiguracoes(area);
     else renderModuloEmPreparacao(area, nome);
   } catch (error) {
@@ -951,6 +955,211 @@ async function darBaixaFinanceiro(id) {
     await atualizarFinanceiroTela();
   } catch (error) { toast(error.message || 'Não foi possível atualizar a situação.'); }
 }
+
+/* =====================================================
+   AGENDA — CALENDÁRIO E TAREFAS
+   Os eventos são alimentados pela aba TAREFAS existente.
+===================================================== */
+function dataLocalISOAgenda(data) {
+  const d = data instanceof Date ? data : new Date(data);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function dataAgendaBR(iso) {
+  if (!iso) return 'Sem prazo definido';
+  const p = String(iso).slice(0,10).split('-');
+  return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : String(iso);
+}
+function statusTarefaAgenda(item) {
+  const status = String(item.status || 'PENDENTE').toUpperCase();
+  const hoje = dataLocalISOAgenda(new Date());
+  if (['PENDENTE','EM_ANDAMENTO'].includes(status) && item.data_limite && String(item.data_limite).slice(0,10) < hoje) return 'ATRASADA';
+  return status;
+}
+function statusTarefaLabelAgenda(status) {
+  return ({PENDENTE:'Pendente',EM_ANDAMENTO:'Em andamento',CONCLUIDA:'Concluída',CANCELADA:'Cancelada',ATRASADA:'Atrasada'})[status] || status;
+}
+function nomeMesAgenda(data) {
+  return data.toLocaleDateString('pt-BR', {month:'long', year:'numeric'}).replace(/^./, c => c.toUpperCase());
+}
+async function renderAgenda(area) {
+  const config = MODULOS.agenda;
+  const mesISO = dataLocalISOAgenda(agendaMesAtual).slice(0,7);
+  area.innerHTML = cabecalhoModulo(config) + `
+    <section class="agenda-resumo">
+      <div class="agenda-kpi"><small>Tarefas no mês</small><strong id="agenda-kpi-mes">—</strong></div>
+      <div class="agenda-kpi"><small>Atrasadas</small><strong id="agenda-kpi-atrasadas">—</strong></div>
+      <div class="agenda-kpi"><small>Concluídas</small><strong id="agenda-kpi-concluidas">—</strong></div>
+    </section>
+    <section class="agenda-calendario">
+      <div class="agenda-cal-topo">
+        <button type="button" id="agenda-anterior" aria-label="Mês anterior">‹</button>
+        <strong id="agenda-mes-titulo">${esc(nomeMesAgenda(agendaMesAtual))}</strong>
+        <button type="button" id="agenda-proximo" aria-label="Próximo mês">›</button>
+      </div>
+      <div class="agenda-semana"><span>Dom</span><span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span></div>
+      <div class="agenda-dias" id="agenda-dias"></div>
+      <div class="agenda-legenda"><span><i class="agenda-ponto"></i>Tem tarefa</span><span><i class="agenda-ponto atrasado"></i>Prazo atrasado</span><button type="button" id="agenda-hoje">Hoje</button></div>
+    </section>
+    <section class="agenda-lista-area">
+      <div class="agenda-lista-titulo"><div><small id="agenda-subtitulo-lista">Compromissos</small><h3 id="agenda-data-lista">Tarefas do dia</h3></div><button type="button" class="botao-acao destaque" id="agenda-nova-tarefa">＋ Nova tarefa</button></div>
+      <div class="agenda-filtros">
+        <input id="agenda-busca" class="campo-busca" type="search" placeholder="Buscar tarefa, responsável ou vínculo">
+        <select id="agenda-filtro-status" class="campo-filtro"><option value="TODOS">Todos os status</option><option value="PENDENTE">Pendentes</option><option value="EM_ANDAMENTO">Em andamento</option><option value="CONCLUIDA">Concluídas</option><option value="CANCELADA">Canceladas</option><option value="ATRASADA">Atrasadas</option></select>
+        <select id="agenda-filtro-responsavel" class="campo-filtro"><option value="TODOS">Toda a equipe</option></select>
+      </div>
+      <div id="agenda-status-carregamento" class="status">Carregando tarefas...</div>
+      <div id="agenda-lista" class="lista-registros"></div>
+      <div class="aviso-modulo agenda-aviso"><strong>Agenda conectada às Tarefas:</strong> cada compromisso é registrado uma única vez na aba TAREFAS. O calendário usa a data-limite, o responsável, a prioridade e o status cadastrados.</div>
+    </section>`;
+  $('agenda-anterior').addEventListener('click', () => mudarMesAgenda(-1));
+  $('agenda-proximo').addEventListener('click', () => mudarMesAgenda(1));
+  $('agenda-hoje').addEventListener('click', () => {
+    const hoje = new Date(); agendaMesAtual = new Date(hoje.getFullYear(), hoje.getMonth(), 1); agendaDiaSelecionado = dataLocalISOAgenda(hoje); renderCalendarioAgenda(); renderListaAgenda();
+  });
+  $('agenda-nova-tarefa').addEventListener('click', () => abrirFormularioTarefaAgenda());
+  $('agenda-busca').addEventListener('input', renderListaAgenda);
+  $('agenda-filtro-status').addEventListener('change', renderListaAgenda);
+  $('agenda-filtro-responsavel').addEventListener('change', renderListaAgenda);
+  await atualizarAgenda();
+}
+function mudarMesAgenda(delta) {
+  agendaMesAtual = new Date(agendaMesAtual.getFullYear(), agendaMesAtual.getMonth() + delta, 1);
+  agendaDiaSelecionado = null;
+  renderCalendarioAgenda();
+  renderListaAgenda();
+}
+async function atualizarAgenda() {
+  const status = $('agenda-status-carregamento');
+  if (!status) return;
+  status.className = 'status'; status.textContent = 'Carregando tarefas...';
+  try {
+    const result = await chamarApi({action:'listarTarefas'});
+    agendaTarefasCache = result.dados.tarefas || [];
+    const responsaveis = [...new Set(agendaTarefasCache.map(t => String(t.responsavel || '').trim()).filter(Boolean))].sort((a,b) => a.localeCompare(b,'pt-BR'));
+    const filtro = $('agenda-filtro-responsavel');
+    const anterior = filtro.value || 'TODOS';
+    filtro.innerHTML = '<option value="TODOS">Toda a equipe</option>' + responsaveis.map(r => `<option value="${esc(r)}">${esc(r)}</option>`).join('');
+    filtro.value = responsaveis.includes(anterior) ? anterior : 'TODOS';
+    status.className = 'status ok'; status.textContent = `${agendaTarefasCache.length} tarefa(s) cadastrada(s).`;
+    renderCalendarioAgenda(); renderListaAgenda();
+  } catch (error) {
+    status.className = 'status error'; status.textContent = error.message || 'Não foi possível carregar a Agenda.';
+    $('agenda-dias').innerHTML = '<div class="vazio">Não foi possível carregar o calendário.</div>';
+    $('agenda-lista').innerHTML = '';
+  }
+}
+function renderCalendarioAgenda() {
+  const grid = $('agenda-dias'); if (!grid) return;
+  const ano = agendaMesAtual.getFullYear(), mes = agendaMesAtual.getMonth();
+  $('agenda-mes-titulo').textContent = nomeMesAgenda(agendaMesAtual);
+  const primeiroDia = new Date(ano, mes, 1).getDay();
+  const totalDias = new Date(ano, mes + 1, 0).getDate();
+  const hoje = dataLocalISOAgenda(new Date());
+  const tarefasMes = agendaTarefasCache.filter(t => String(t.data_limite || '').slice(0,7) === `${ano}-${String(mes+1).padStart(2,'0')}`);
+  const atrasadas = agendaTarefasCache.filter(t => statusTarefaAgenda(t) === 'ATRASADA');
+  $('agenda-kpi-mes').textContent = tarefasMes.length;
+  $('agenda-kpi-atrasadas').textContent = atrasadas.length;
+  $('agenda-kpi-concluidas').textContent = tarefasMes.filter(t => String(t.status).toUpperCase() === 'CONCLUIDA').length;
+  let html = '';
+  for (let i=0;i<primeiroDia;i++) html += '<span class="agenda-dia vazio-dia" aria-hidden="true"></span>';
+  for (let dia=1;dia<=totalDias;dia++) {
+    const iso = `${ano}-${String(mes+1).padStart(2,'0')}-${String(dia).padStart(2,'0')}`;
+    const doDia = agendaTarefasCache.filter(t => String(t.data_limite || '').slice(0,10) === iso);
+    const temAtrasada = doDia.some(t => statusTarefaAgenda(t) === 'ATRASADA');
+    const classes = ['agenda-dia', iso === hoje ? 'hoje' : '', iso === agendaDiaSelecionado ? 'selecionado' : '', doDia.length ? 'com-tarefa' : ''].filter(Boolean).join(' ');
+    html += `<button type="button" class="${classes}" data-agenda-dia="${iso}" aria-label="${dia} de ${nomeMesAgenda(agendaMesAtual)}${doDia.length ? `, ${doDia.length} tarefa(s)` : ''}"><span>${dia}</span>${doDia.length ? `<i class="agenda-ponto ${temAtrasada ? 'atrasado' : ''}"></i><small>${doDia.length}</small>` : ''}</button>`;
+  }
+  grid.innerHTML = html;
+  grid.querySelectorAll('[data-agenda-dia]').forEach(btn => btn.addEventListener('click', () => { agendaDiaSelecionado = btn.dataset.agendaDia; renderCalendarioAgenda(); renderListaAgenda(); }));
+}
+function renderListaAgenda() {
+  const alvo = $('agenda-lista'); if (!alvo) return;
+  const termo = normalizarTexto($('agenda-busca')?.value || '');
+  const filtroStatus = $('agenda-filtro-status')?.value || 'TODOS';
+  const filtroResponsavel = $('agenda-filtro-responsavel')?.value || 'TODOS';
+  const anoMes = dataLocalISOAgenda(agendaMesAtual).slice(0,7);
+  let titulo = 'Tarefas do mês';
+  let lista = agendaTarefasCache.slice();
+  if (agendaDiaSelecionado) {
+    titulo = `Tarefas de ${dataAgendaBR(agendaDiaSelecionado)}`;
+    lista = lista.filter(t => String(t.data_limite || '').slice(0,10) === agendaDiaSelecionado);
+  } else {
+    lista = lista.filter(t => !t.data_limite || String(t.data_limite).slice(0,7) === anoMes);
+  }
+  lista = lista.filter(t => {
+    const statusReal = String(t.status || 'PENDENTE').toUpperCase();
+    const statusTela = statusTarefaAgenda(t);
+    const texto = normalizarTexto([t.titulo,t.descricao,t.responsavel,t.vinculo_tipo,t.vinculo_id].join(' '));
+    return (!termo || texto.includes(termo)) && (filtroStatus === 'TODOS' || (filtroStatus === 'ATRASADA' ? statusTela === 'ATRASADA' : statusReal === filtroStatus)) && (filtroResponsavel === 'TODOS' || String(t.responsavel || '') === filtroResponsavel);
+  });
+  lista.sort((a,b) => String(a.data_limite || '9999-99-99').localeCompare(String(b.data_limite || '9999-99-99')) || String(a.titulo || '').localeCompare(String(b.titulo || ''),'pt-BR'));
+  $('agenda-data-lista').textContent = titulo;
+  $('agenda-subtitulo-lista').textContent = `${lista.length} tarefa(s)`;
+  alvo.innerHTML = lista.length ? lista.map(t => {
+    const status = statusTarefaAgenda(t);
+    const prioridade = String(t.prioridade || 'MEDIA').toUpperCase();
+    const vinculo = t.vinculo_tipo && t.vinculo_id ? `${t.vinculo_tipo}: ${t.vinculo_id}` : '';
+    const concluida = String(t.status).toUpperCase() === 'CONCLUIDA';
+    return `<article class="registro agenda-registro ${concluida ? 'agenda-concluida' : ''}">
+      <div class="registro-topo"><div><h3>${esc(t.titulo || 'Tarefa sem título')}</h3><div class="meta">${esc(t.responsavel || 'Sem responsável')} · ${esc(t.data_limite ? dataAgendaBR(t.data_limite) : 'Sem prazo')}</div>${vinculo ? `<div class="meta">Vínculo: ${esc(vinculo)}</div>` : ''}</div>${badge(statusTarefaLabelAgenda(status))}</div>
+      ${t.descricao ? `<p class="agenda-descricao">${esc(t.descricao)}</p>` : ''}
+      <div class="agenda-registro-rodape"><span class="agenda-prioridade ${esc(normalizarStatus(prioridade))}">Prioridade ${esc(({BAIXA:'baixa',MEDIA:'média',ALTA:'alta',URGENTE:'urgente'})[prioridade] || prioridade.toLowerCase())}</span><div class="registro-acoes"><button type="button" class="botao-acao" data-agenda-editar="${esc(t.id_tarefa)}">Editar</button>${!concluida && status !== 'CANCELADA' ? `<button type="button" class="botao-acao destaque" data-agenda-status="${esc(t.id_tarefa)}" data-status="CONCLUIDA">Concluir</button>` : (concluida ? `<button type="button" class="botao-acao" data-agenda-status="${esc(t.id_tarefa)}" data-status="PENDENTE">Reabrir</button>` : '')}</div></div>
+    </article>`;
+  }).join('') : '<div class="vazio">Nenhuma tarefa para este período. Use “＋ Nova tarefa” para incluir um compromisso ou prazo.</div>';
+  alvo.querySelectorAll('[data-agenda-editar]').forEach(btn => btn.addEventListener('click', () => { const item = agendaTarefasCache.find(t => String(t.id_tarefa) === btn.dataset.agendaEditar); if (item) abrirFormularioTarefaAgenda(item); }));
+  alvo.querySelectorAll('[data-agenda-status]').forEach(btn => btn.addEventListener('click', () => alterarStatusTarefaAgenda(btn.dataset.agendaStatus, btn.dataset.status)));
+}
+function abrirFormularioTarefaAgenda(tarefa = null) {
+  const editar = !!tarefa;
+  const opcoesPrioridade = [['BAIXA','Baixa'],['MEDIA','Média'],['ALTA','Alta'],['URGENTE','Urgente']];
+  const opcoesStatus = [['PENDENTE','Pendente'],['EM_ANDAMENTO','Em andamento'],['CONCLUIDA','Concluída'],['CANCELADA','Cancelada']];
+  const select = (lista, atual) => lista.map(([v,l]) => `<option value="${v}" ${String(atual || '') === v ? 'selected' : ''}>${l}</option>`).join('');
+  abrirModal(editar ? 'Editar tarefa da Agenda' : 'Nova tarefa na Agenda', `
+    <form id="form-tarefa-agenda" class="form-grid">
+      <div class="form-grupo full"><label for="agenda-titulo">Título *</label><input id="agenda-titulo" class="campo-form" name="titulo" maxlength="120" required value="${esc(tarefa?.titulo || '')}" placeholder="Ex.: Entregar sapateira ao cliente"></div>
+      <div class="form-grupo full"><label for="agenda-descricao">Descrição</label><textarea id="agenda-descricao" class="campo-form textarea" name="descricao" maxlength="1200" placeholder="Detalhes do compromisso, visita ou etapa de produção">${esc(tarefa?.descricao || '')}</textarea></div>
+      <div class="form-grupo"><label for="agenda-responsavel">Responsável</label><input id="agenda-responsavel" class="campo-form" name="responsavel" maxlength="80" value="${esc(tarefa?.responsavel || (sessao.usuario?.nome || ''))}" placeholder="Fernando ou Letícia"></div>
+      <div class="form-grupo"><label for="agenda-data-limite">Data / prazo</label><input id="agenda-data-limite" class="campo-form" type="date" name="data_limite" value="${esc(String(tarefa?.data_limite || (agendaDiaSelecionado || '')).slice(0,10))}"></div>
+      <div class="form-grupo"><label for="agenda-prioridade">Prioridade</label><select id="agenda-prioridade" class="campo-form" name="prioridade">${select(opcoesPrioridade,tarefa?.prioridade || 'MEDIA')}</select></div>
+      <div class="form-grupo"><label for="agenda-status">Situação</label><select id="agenda-status" class="campo-form" name="status">${select(opcoesStatus,tarefa?.status || 'PENDENTE')}</select></div>
+      <div class="form-grupo"><label for="agenda-vinculo-tipo">Vincular a</label><select id="agenda-vinculo-tipo" class="campo-form" name="vinculo_tipo"><option value="">Nenhum</option><option value="PEDIDO" ${tarefa?.vinculo_tipo === 'PEDIDO' ? 'selected' : ''}>Pedido</option><option value="CLIENTE" ${tarefa?.vinculo_tipo === 'CLIENTE' ? 'selected' : ''}>Cliente</option></select></div>
+      <div class="form-grupo"><label for="agenda-vinculo-id">Código do vínculo</label><input id="agenda-vinculo-id" class="campo-form" name="vinculo_id" maxlength="60" value="${esc(tarefa?.vinculo_id || '')}" placeholder="Ex.: PED-001"></div>
+      <div class="form-grupo full"><small class="ajuda-campo">A Agenda utiliza a aba TAREFAS existente. A data informada é a data-limite; horários específicos não fazem parte das colunas atuais.</small><div id="erro-form-tarefa-agenda" class="mensagem"></div></div>
+      <div class="form-acoes full"><button type="button" class="botao-acao" data-fechar-modal>Cancelar</button><button type="submit" class="botao-acao destaque">${editar ? 'Salvar alterações' : 'Criar tarefa'}</button></div>
+    </form>`);
+  $('form-tarefa-agenda').querySelector('[data-fechar-modal]').addEventListener('click', fecharModal);
+  $('form-tarefa-agenda').addEventListener('submit', async event => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const dados = Object.fromEntries(new FormData(form).entries());
+    const tipo = String(dados.vinculo_tipo || '').trim();
+    const vinculoId = String(dados.vinculo_id || '').trim();
+    if (tipo && !vinculoId) { $('erro-form-tarefa-agenda').textContent = 'Informe o código do pedido ou cliente vinculado.'; return; }
+    if (!tipo && vinculoId) { $('erro-form-tarefa-agenda').textContent = 'Escolha o tipo de vínculo para esse código.'; return; }
+    const botao = form.querySelector('[type="submit"]'); botao.disabled = true; botao.textContent = 'Salvando...';
+    try {
+      const result = editar
+        ? await chamarApi({action:'atualizarTarefa',id_tarefa:tarefa.id_tarefa,tarefa:dados})
+        : await chamarApi({action:'cadastrarTarefa',tarefa:dados});
+      fecharModal(); toast(result.dados?.mensagem || 'Tarefa salva com sucesso.'); await atualizarAgenda();
+    } catch (error) {
+      $('erro-form-tarefa-agenda').textContent = error.message || 'Não foi possível salvar a tarefa.';
+      botao.disabled = false; botao.textContent = editar ? 'Salvar alterações' : 'Criar tarefa';
+    }
+  });
+}
+async function alterarStatusTarefaAgenda(id, status) {
+  const tarefa = agendaTarefasCache.find(t => String(t.id_tarefa) === String(id));
+  if (!tarefa) return;
+  const pergunta = status === 'CONCLUIDA' ? `Marcar “${tarefa.titulo}” como concluída?` : `Reabrir “${tarefa.titulo}”?`;
+  if (!confirm(pergunta)) return;
+  try {
+    const result = await chamarApi({action:'alterarStatusTarefa',id_tarefa:id,status});
+    toast(result.dados?.mensagem || 'Situação atualizada.');
+    await atualizarAgenda();
+  } catch (error) { toast(error.message || 'Não foi possível atualizar a tarefa.'); }
+}
+
 
 function renderModuloEmPreparacao(area, nome) {
   const config = MODULOS[nome];

@@ -536,3 +536,46 @@ body { max-width:520px; margin:0 auto; }
 .badge-status.atrasado{background:#ffd7d4;color:#8b1711}
 .financeiro-aviso{margin-top:12px}
 @media(max-width:360px){.financeiro-kpi{padding:8px 6px}.financeiro-kpi small{font-size:9px}.financeiro-kpi strong{font-size:12px}.financeiro-valor{font-size:12px}.financeiro-filtros{gap:5px}}
+
+
+/* AGENDA — calendário, tarefas e prazos */
+.agenda-resumo{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:0 0 11px}
+.agenda-kpi{min-width:0;padding:10px 9px;background:#fff;color:#151515;border:1px solid #111;border-radius:12px;box-shadow:0 3px 9px rgba(0,0,0,.08)}
+.agenda-kpi small{display:block;font-size:10px;color:#63452f;line-height:1.2}
+.agenda-kpi strong{display:block;margin-top:5px;font-size:19px;line-height:1.1;overflow-wrap:anywhere}
+.agenda-kpi:nth-child(2) strong{color:#b3261e}.agenda-kpi:nth-child(3) strong{color:#1e7d36}
+.agenda-calendario{padding:12px;background:#111;color:#fff;border:1px solid #000;border-radius:16px;box-shadow:0 5px 14px rgba(0,0,0,.16);margin:0 0 14px}
+.agenda-cal-topo{display:grid;grid-template-columns:40px 1fr 40px;align-items:center;gap:8px;margin-bottom:12px}
+.agenda-cal-topo strong{text-align:center;font-size:15px;text-transform:capitalize}
+.agenda-cal-topo button{height:36px;border:1px solid #4a4a4a;border-radius:10px;background:#242424;color:#fff;font-size:25px;line-height:1}
+.agenda-semana,.agenda-dias{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.agenda-semana{margin-bottom:5px}.agenda-semana span{text-align:center;color:#d8d8d8;font-size:10px;font-weight:800;padding:5px 0}
+.agenda-dia{position:relative;min-width:0;min-height:47px;border:1px solid transparent;border-radius:9px;background:#1b1b1b;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:2px;padding:6px 2px 3px;font-size:12px}
+.agenda-dia.vazio-dia{background:transparent;border:0;pointer-events:none}
+.agenda-dia.hoje{border-color:#ED7014;color:#ffb47c}
+.agenda-dia.selecionado{background:#ED7014;color:#111;border-color:#fff;font-weight:900}
+.agenda-dia small{font-size:9px;line-height:1;font-weight:800}
+.agenda-ponto{display:inline-block;width:6px;height:6px;border-radius:50%;background:#73d58d}
+.agenda-ponto.atrasado{background:#ff7770}
+.agenda-dia .agenda-ponto{margin-top:1px}
+.agenda-legenda{display:flex;align-items:center;justify-content:center;gap:15px;flex-wrap:wrap;margin-top:11px;color:#ccc;font-size:10px}
+.agenda-legenda span{display:flex;align-items:center;gap:5px}.agenda-legenda button{border:1px solid #ED7014;border-radius:20px;background:transparent;color:#ffb47c;font-size:10px;font-weight:800;padding:5px 11px}
+.agenda-lista-area{margin-top:4px}
+.agenda-lista-titulo{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 10px}
+.agenda-lista-titulo small{display:block;font-size:10px;color:#523019;text-transform:uppercase;font-weight:800;letter-spacing:.7px}
+.agenda-lista-titulo h3{font-size:16px;color:#111;margin-top:3px}
+.agenda-lista-titulo .botao-acao{flex:0 0 auto;padding:10px 12px}
+.agenda-filtros{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:8px 0 10px}
+.agenda-filtros .campo-busca{grid-column:1/-1;width:100%;min-width:0}
+.agenda-filtros .campo-filtro{width:100%;min-width:0}
+.agenda-registro{border-left:4px solid #ED7014}
+.agenda-registro.agenda-concluida{border-left-color:#248344;opacity:.88}
+.agenda-descricao{font-size:12px;color:#e3e3e3;line-height:1.45;margin:8px 0 3px;white-space:pre-wrap;overflow-wrap:anywhere}
+.agenda-registro-rodape{display:flex;align-items:center;justify-content:space-between;gap:7px;flex-wrap:wrap;margin-top:10px;padding-top:8px;border-top:1px solid #333}
+.agenda-registro-rodape .registro-acoes{margin:0;gap:6px}
+.agenda-registro-rodape .botao-acao{padding:7px 9px;font-size:11px}
+.agenda-prioridade{display:inline-flex;align-items:center;padding:4px 8px;border-radius:20px;background:#333;color:#fff;font-size:10px;font-weight:800}
+.agenda-prioridade.baixa{background:#d9eee0;color:#205b31}.agenda-prioridade.media{background:#e9e1d9;color:#57412f}.agenda-prioridade.alta{background:#ffe0bd;color:#83450a}.agenda-prioridade.urgente{background:#ffd9d6;color:#9b201a}
+.badge-status.pendente{background:#ffe7bf;color:#754500}.badge-status.em-andamento{background:#dceaff;color:#164c82}.badge-status.concluida{background:#d8f0df;color:#1d6632}.badge-status.cancelada{background:#e7e7e7;color:#555}.badge-status.atrasada{background:#ffd7d4;color:#8b1711}
+.agenda-aviso{margin-top:12px}
+@media(max-width:360px){.agenda-kpi{padding:8px 6px}.agenda-kpi small{font-size:9px}.agenda-kpi strong{font-size:16px}.agenda-dia{min-height:42px;font-size:11px}.agenda-lista-titulo h3{font-size:14px}.agenda-lista-titulo .botao-acao{padding:9px 9px;font-size:11px}}
