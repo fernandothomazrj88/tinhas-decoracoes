@@ -618,3 +618,26 @@ body { max-width:520px; margin:0 auto; }
 .portfolio-galeria-modal img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;background:#24150c}
 .portfolio-galeria-modal figcaption{padding:6px 8px;font-size:10px;color:#eee}
 .portfolio-galeria-modal .imagem-indisponivel img{object-fit:contain;min-height:100px}
+
+
+/* MARKETING — PLANEJAMENTO EDITORIAL */
+.marketing-resumo{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:0 0 11px}
+.marketing-kpi{min-width:0;padding:10px 9px;background:#fff;color:#111;border:1px solid #111;border-radius:12px;box-shadow:0 3px 9px rgba(0,0,0,.08)}
+.marketing-kpi small{display:block;font-size:10px;color:#63452f;line-height:1.2}.marketing-kpi strong{display:block;margin-top:5px;font-size:19px;line-height:1.1;overflow-wrap:anywhere}
+.marketing-kpi.producao{border-left:4px solid #ED7014}.marketing-kpi.publicado{border-left:4px solid #238343}
+.marketing-acoes .botao-acao{flex:1}
+.marketing-filtros{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:8px 0 10px}.marketing-filtros .campo-busca{grid-column:1/-1;width:100%;min-width:0}.marketing-filtros .campo-filtro{width:100%;min-width:0}
+.marketing-fluxo{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:0 0 12px}
+.marketing-etapa{min-width:0;border:1px solid rgba(0,0,0,.22);border-radius:10px;background:rgba(255,255,255,.58);color:#25170e;padding:8px 5px;text-align:center;display:flex;flex-direction:column;gap:3px;align-items:center}
+.marketing-etapa strong{font-size:17px;line-height:1}.marketing-etapa span{font-size:9px;font-weight:800;line-height:1.15}.marketing-etapa.tem-itens{background:#fff;border-color:#111}
+.marketing-lista{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;align-items:stretch}
+.marketing-card{min-width:0;background:#111;color:#fff;border:1px solid #000;border-radius:14px;padding:11px;box-shadow:0 4px 12px rgba(0,0,0,.12);overflow:hidden}
+.marketing-card-topo{display:flex;align-items:flex-start;justify-content:space-between;gap:5px;margin-bottom:8px}.marketing-card-topo>div{display:flex;gap:5px;flex-wrap:wrap;min-width:0}
+.marketing-tipo,.marketing-canal{display:inline-flex;padding:4px 7px;border-radius:20px;font-size:9px;font-weight:800;background:#333;color:#fff}.marketing-canal{background:#ed7014;color:#111}
+.marketing-card h3{font-size:14px;line-height:1.25;overflow-wrap:anywhere;margin:3px 0 7px}.marketing-metadados{display:flex;gap:6px;flex-wrap:wrap;color:#d7d7d7;font-size:10px;line-height:1.35}
+.marketing-ideia{margin-top:9px;padding-top:8px;border-top:1px solid #333;color:#ddd;font-size:11px;line-height:1.4;white-space:pre-wrap;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.marketing-legenda{margin-top:8px;background:#1c1c1c;border-radius:9px;padding:8px}.marketing-legenda strong{font-size:10px;color:#ffb47c}.marketing-legenda p{font-size:10px;color:#eee;line-height:1.4;white-space:pre-wrap;overflow-wrap:anywhere;max-height:88px;overflow:auto;margin:4px 0 7px}.marketing-legenda .botao-acao{padding:6px 8px;font-size:9px}
+.marketing-publicacao{margin-top:8px;color:#8fe0a5;font-size:10px;font-weight:700}
+.marketing-card .registro-acoes{margin-top:10px;gap:5px}.marketing-card .registro-acoes .botao-acao{flex:1;min-width:0;padding:7px 5px;font-size:9px;white-space:normal}
+.marketing-vazio{grid-column:1/-1}.marketing-aviso{margin-top:12px}
+@media(max-width:360px){.marketing-resumo{gap:5px}.marketing-kpi{padding:8px 6px}.marketing-kpi small{font-size:9px}.marketing-kpi strong{font-size:16px}.marketing-lista{gap:7px}.marketing-card{padding:8px}.marketing-card h3{font-size:12px}.marketing-card .registro-acoes .botao-acao{font-size:8px;padding:6px 4px}.marketing-etapa{padding:7px 3px}.marketing-etapa span{font-size:8px}}

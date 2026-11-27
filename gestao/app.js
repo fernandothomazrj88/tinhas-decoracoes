@@ -1,6 +1,6 @@
 'use strict';
 
-const TINHAS_VERSION = (window.TINHAS_CONFIG && window.TINHAS_CONFIG.APP_VERSION) || '1.7.0';
+const TINHAS_VERSION = (window.TINHAS_CONFIG && window.TINHAS_CONFIG.APP_VERSION) || '1.8.0';
 const STORAGE_TOKEN = 'tinhas_gestao_token';
 const STORAGE_USER = 'tinhas_gestao_usuario';
 const STATUS_PRODUCAO = ['Aguardando material', 'Em produção', 'Acabamento', 'Pronto', 'Entregue', 'Cancelado'];
@@ -16,6 +16,7 @@ let pedidosCache = [];
 let materiaisCache = [];
 let agendaTarefasCache = [];
 let portfolioCache = [];
+let marketingCache = [];
 let agendaMesAtual = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let agendaDiaSelecionado = null;
 let installPromptEvent = null;
@@ -337,6 +338,7 @@ async function abrirModulo(nome) {
     else if (nome === 'financeiro') await renderFinanceiro(area);
     else if (nome === 'agenda') await renderAgenda(area);
     else if (nome === 'portfolio') await renderPortfolio(area);
+    else if (nome === 'marketing') await renderMarketing(area);
     else if (nome === 'configuracoes') await renderConfiguracoes(area);
     else renderModuloEmPreparacao(area, nome);
   } catch (error) {
@@ -1334,6 +1336,169 @@ async function alterarStatusTarefaAgenda(id, status) {
     toast(result.dados?.mensagem || 'Situação atualizada.');
     await atualizarAgenda();
   } catch (error) { toast(error.message || 'Não foi possível atualizar a tarefa.'); }
+}
+
+
+
+/* =====================================================
+   MARKETING — CALENDÁRIO EDITORIAL
+===================================================== */
+const STATUS_MARKETING_UI = [
+  ['IDEIA','Ideia'],['EM_PRODUCAO','Em produção'],['PRONTO','Pronto para publicar'],
+  ['AGENDADO','Agendado'],['PUBLICADO','Publicado'],['PAUSADO','Pausado']
+];
+function statusMarketingCanonicoUI(status) {
+  const n = normalizarTexto(status).replace(/[^a-z0-9]+/g,' ').trim();
+  const mapa = {
+    'ideia':'IDEIA','ideias':'IDEIA','pauta':'IDEIA','rascunho':'IDEIA','backlog':'IDEIA',
+    'em producao':'EM_PRODUCAO','em criacao':'EM_PRODUCAO','em andamento':'EM_PRODUCAO','producao':'EM_PRODUCAO','em edicao':'EM_PRODUCAO','edicao':'EM_PRODUCAO',
+    'pronto':'PRONTO','pronta':'PRONTO','revisao':'PRONTO','em revisao':'PRONTO','aprovado':'PRONTO','aprovada':'PRONTO','pronto para publicar':'PRONTO',
+    'agendado':'AGENDADO','agendada':'AGENDADO','programado':'AGENDADO','programada':'AGENDADO',
+    'publicado':'PUBLICADO','publicada':'PUBLICADO','no ar':'PUBLICADO','postado':'PUBLICADO','postada':'PUBLICADO',
+    'pausado':'PAUSADO','pausada':'PAUSADO','cancelado':'PAUSADO','cancelada':'PAUSADO','arquivado':'PAUSADO','arquivada':'PAUSADO'
+  };
+  return mapa[n] || String(status || 'IDEIA').toUpperCase();
+}
+function statusMarketingLabelUI(status) {
+  const canonico = statusMarketingCanonicoUI(status);
+  return (STATUS_MARKETING_UI.find(x => x[0] === canonico) || [canonico,canonico])[1];
+}
+function dataMarketingBRUI(iso) {
+  if (!iso) return 'Sem data';
+  const p = String(iso).slice(0,10).split('-');
+  return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : String(iso);
+}
+async function renderMarketing(area) {
+  area.innerHTML = cabecalhoModulo(MODULOS.marketing) + `
+    <section class="marketing-resumo">
+      <div class="marketing-kpi"><small>Conteúdos cadastrados</small><strong id="marketing-kpi-total">—</strong></div>
+      <div class="marketing-kpi producao"><small>Em produção</small><strong id="marketing-kpi-producao">—</strong></div>
+      <div class="marketing-kpi publicado"><small>Publicados</small><strong id="marketing-kpi-publicados">—</strong></div>
+    </section>
+    <div class="barra-acoes marketing-acoes">
+      <button type="button" id="marketing-novo" class="botao-acao destaque">＋ Novo conteúdo</button>
+      <button type="button" id="marketing-atualizar" class="botao-acao">↻ Atualizar</button>
+    </div>
+    <div class="marketing-filtros">
+      <input id="marketing-busca" class="campo-busca" type="search" placeholder="Buscar título, ideia, legenda ou projeto">
+      <select id="marketing-filtro-status" class="campo-filtro"><option value="TODOS">Todos os status</option>${STATUS_MARKETING_UI.map(x=>`<option value="${x[0]}">${x[1]}</option>`).join('')}</select>
+      <select id="marketing-filtro-canal" class="campo-filtro"><option value="TODOS">Todos os canais</option></select>
+      <select id="marketing-filtro-tipo" class="campo-filtro"><option value="TODOS">Todos os formatos</option></select>
+    </div>
+    <div class="marketing-fluxo" id="marketing-fluxo"></div>
+    <div id="marketing-status-carregamento" class="status">Carregando planejamento de conteúdo...</div>
+    <div id="marketing-lista" class="marketing-lista"></div>
+    <div class="aviso-modulo marketing-aviso"><strong>Planejamento editorial:</strong> este módulo organiza ideias, produção, agendamento e registro de publicação na aba MARKETING. Ele não publica automaticamente no Instagram. O campo Projeto permite relacionar o conteúdo a um trabalho do Portfólio.</div>`;
+  $('marketing-novo').addEventListener('click', () => abrirFormularioMarketing());
+  $('marketing-atualizar').addEventListener('click', atualizarMarketingTela);
+  ['marketing-busca','marketing-filtro-status','marketing-filtro-canal','marketing-filtro-tipo'].forEach(id => $(id).addEventListener(id === 'marketing-busca' ? 'input' : 'change', renderListaMarketing));
+  await atualizarMarketingTela();
+}
+async function atualizarMarketingTela() {
+  const status = $('marketing-status-carregamento'); if (!status) return;
+  status.className = 'status'; status.textContent = 'Consultando conteúdos...';
+  try {
+    const result = await chamarApi({action:'listarMarketing'});
+    marketingCache = result.dados.conteudos || [];
+    const canais = [...new Set(marketingCache.map(x=>String(x.canal||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    const tipos = [...new Set(marketingCache.map(x=>String(x.tipo||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    const canalFiltro = $('marketing-filtro-canal'), tipoFiltro = $('marketing-filtro-tipo');
+    const canalAnterior = canalFiltro.value || 'TODOS', tipoAnterior = tipoFiltro.value || 'TODOS';
+    canalFiltro.innerHTML = '<option value="TODOS">Todos os canais</option>'+canais.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');
+    tipoFiltro.innerHTML = '<option value="TODOS">Todos os formatos</option>'+tipos.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');
+    canalFiltro.value = canais.includes(canalAnterior) ? canalAnterior : 'TODOS';
+    tipoFiltro.value = tipos.includes(tipoAnterior) ? tipoAnterior : 'TODOS';
+    const contar = status => marketingCache.filter(x=>statusMarketingCanonicoUI(x.status)===status).length;
+    $('marketing-kpi-total').textContent = marketingCache.length;
+    $('marketing-kpi-producao').textContent = contar('EM_PRODUCAO');
+    $('marketing-kpi-publicados').textContent = contar('PUBLICADO');
+    $('marketing-fluxo').innerHTML = STATUS_MARKETING_UI.map(([s,l])=>`<button type="button" class="marketing-etapa ${contar(s)?'tem-itens':''}" data-marketing-etapa="${s}"><strong>${contar(s)}</strong><span>${l}</span></button>`).join('');
+    $('marketing-fluxo').querySelectorAll('[data-marketing-etapa]').forEach(btn=>btn.addEventListener('click',()=>{ $('marketing-filtro-status').value=btn.dataset.marketingEtapa; renderListaMarketing(); }));
+    status.className = 'status ok'; status.textContent = `${marketingCache.length} conteúdo(s) encontrado(s) na aba MARKETING.`;
+    renderListaMarketing();
+  } catch(error) {
+    status.className = 'status error'; status.textContent = error.message || 'Não foi possível carregar o Marketing.';
+    $('marketing-lista').innerHTML = '<div class="vazio">Não foi possível consultar o planejamento. Verifique a conexão e tente atualizar.</div>';
+  }
+}
+function renderListaMarketing() {
+  const alvo = $('marketing-lista'); if (!alvo) return;
+  const termo = normalizarTexto($('marketing-busca')?.value || '');
+  const filtroStatus = $('marketing-filtro-status')?.value || 'TODOS';
+  const filtroCanal = $('marketing-filtro-canal')?.value || 'TODOS';
+  const filtroTipo = $('marketing-filtro-tipo')?.value || 'TODOS';
+  const lista = marketingCache.filter(x => {
+    const status = statusMarketingCanonicoUI(x.status);
+    const texto = normalizarTexto([x.titulo,x.tipo,x.canal,x.projeto_id,x.ideia,x.legenda,x.responsavel,x.observacoes].join(' '));
+    return (!termo || texto.includes(termo)) && (filtroStatus==='TODOS'||status===filtroStatus) && (filtroCanal==='TODOS'||String(x.canal||'')===filtroCanal) && (filtroTipo==='TODOS'||String(x.tipo||'')===filtroTipo);
+  }).sort((a,b)=>String(a.data_prevista||'9999-99-99').localeCompare(String(b.data_prevista||'9999-99-99'))||String(a.titulo||'').localeCompare(String(b.titulo||''),'pt-BR'));
+  alvo.innerHTML = lista.length ? lista.map(x=>{
+    const status = statusMarketingCanonicoUI(x.status);
+    const proximo = ({IDEIA:'EM_PRODUCAO',EM_PRODUCAO:'PRONTO',PRONTO:'AGENDADO',AGENDADO:'PUBLICADO',PUBLICADO:'PAUSADO',PAUSADO:'IDEIA'})[status] || 'EM_PRODUCAO';
+    const rotulo = status === 'PUBLICADO' ? 'Pausar' : `Avançar: ${statusMarketingLabelUI(proximo)}`;
+    return `<article class="marketing-card">
+      <div class="marketing-card-topo"><div><span class="marketing-tipo">${esc(x.tipo || 'Conteúdo')}</span><span class="marketing-canal">${esc(x.canal || 'Canal não definido')}</span></div>${badge(statusMarketingLabelUI(status))}</div>
+      <h3>${esc(x.titulo || 'Conteúdo sem título')}</h3>
+      <div class="marketing-metadados"><span>📅 ${esc(dataMarketingBRUI(x.data_prevista))}</span><span>👤 ${esc(x.responsavel || 'Sem responsável')}</span>${x.projeto_id?`<span>🔗 ${esc(x.projeto_id)}</span>`:''}</div>
+      ${x.ideia ? `<p class="marketing-ideia"><strong>Ideia:</strong> ${esc(x.ideia)}</p>` : ''}
+      ${x.legenda ? `<div class="marketing-legenda"><strong>Legenda</strong><p>${esc(x.legenda)}</p><button type="button" class="botao-acao" data-marketing-copiar="${esc(x.id_conteudo)}">Copiar legenda</button></div>` : ''}
+      ${x.data_publicado ? `<div class="marketing-publicacao">Publicado em ${esc(dataMarketingBRUI(x.data_publicado))}</div>` : ''}
+      <div class="registro-acoes"><button type="button" class="botao-acao destaque" data-marketing-editar="${esc(x.id_conteudo)}">Editar</button><button type="button" class="botao-acao" data-marketing-status="${esc(x.id_conteudo)}" data-status="${proximo}">${rotulo}</button></div>
+    </article>`;
+  }).join('') : '<div class="vazio marketing-vazio">Nenhum conteúdo encontrado. Clique em “＋ Novo conteúdo” para começar seu planejamento.</div>';
+  alvo.querySelectorAll('[data-marketing-editar]').forEach(btn=>btn.addEventListener('click',()=>{const item=marketingCache.find(x=>String(x.id_conteudo)===btn.dataset.marketingEditar);if(item)abrirFormularioMarketing(item);}));
+  alvo.querySelectorAll('[data-marketing-status]').forEach(btn=>btn.addEventListener('click',()=>alterarStatusMarketingTela(btn.dataset.marketingStatus,btn.dataset.status)));
+  alvo.querySelectorAll('[data-marketing-copiar]').forEach(btn=>btn.addEventListener('click',async()=>{
+    const item=marketingCache.find(x=>String(x.id_conteudo)===btn.dataset.marketingCopiar); if(!item?.legenda)return;
+    try { await navigator.clipboard.writeText(item.legenda); toast('Legenda copiada.'); }
+    catch(_) { window.prompt('Copie a legenda abaixo:',item.legenda); }
+  }));
+}
+async function abrirFormularioMarketing(item=null) {
+  const editar = !!item;
+  let portfolio = [];
+  try { const r = await chamarApi({action:'listarPortfolio'}); portfolio = r.dados.portfolio || []; }
+  catch(_) { portfolio = []; }
+  const projetos = portfolio.map(p=>({id:String(p.id_projeto||p.id_portfolio||''),titulo:p.titulo||'Projeto'})).filter(p=>p.id);
+  const opcoes = (lista, atual) => lista.map(v=>`<option value="${esc(v[0])}" ${String(v[0])===String(atual||'')?'selected':''}>${esc(v[1])}</option>`).join('');
+  const canais = ['Instagram','Facebook','TikTok','WhatsApp','Site','Pinterest','Outro'];
+  const tipos = ['Post','Carrossel','Reels','Stories','Vídeo','Bastidores','Depoimento','Outro'];
+  const statusAtual = statusMarketingCanonicoUI(item?.status || 'IDEIA');
+  abrirModal(editar?'Editar conteúdo de Marketing':'Planejar novo conteúdo',`
+    <form id="form-marketing" class="form-grid">
+      <div class="form-grupo full"><label for="mkt-titulo">Título do conteúdo *</label><input id="mkt-titulo" class="campo-form" name="titulo" maxlength="140" required placeholder="Ex.: Bastidores da fabricação do aparador" value="${esc(item?.titulo||'')}"></div>
+      <div class="form-grupo"><label for="mkt-tipo">Formato *</label><select id="mkt-tipo" class="campo-form" name="tipo" required>${opcoes(tipos.map(x=>[x,x]),item?.tipo||'Reels')}</select></div>
+      <div class="form-grupo"><label for="mkt-canal">Canal *</label><select id="mkt-canal" class="campo-form" name="canal" required>${opcoes(canais.map(x=>[x,x]),item?.canal||'Instagram')}</select></div>
+      <div class="form-grupo full"><label for="mkt-projeto">Projeto relacionado (opcional)</label><input id="mkt-projeto" class="campo-form" name="projeto_id" list="mkt-projetos" maxlength="80" value="${esc(item?.projeto_id||'')}" placeholder="Selecione ou digite o ID do projeto"><datalist id="mkt-projetos">${projetos.map(p=>`<option value="${esc(p.id)}">${esc(p.titulo)}</option>`).join('')}</datalist><small class="ajuda-campo">Use o ID de um projeto do Portfólio quando o conteúdo divulgar um trabalho específico.</small></div>
+      <div class="form-grupo full"><label for="mkt-ideia">Ideia / roteiro</label><textarea id="mkt-ideia" class="campo-form textarea" name="ideia" maxlength="3000" placeholder="Objetivo do conteúdo, cenas, roteiro ou pontos que precisam aparecer...">${esc(item?.ideia||'')}</textarea></div>
+      <div class="form-grupo full"><label for="mkt-legenda">Legenda / texto da publicação</label><textarea id="mkt-legenda" class="campo-form textarea" name="legenda" maxlength="5000" placeholder="Escreva a legenda, chamada, hashtags e CTA...">${esc(item?.legenda||'')}</textarea></div>
+      <div class="form-grupo"><label for="mkt-status">Etapa</label><select id="mkt-status" class="campo-form" name="status">${opcoes(STATUS_MARKETING_UI,statusAtual)}</select></div>
+      <div class="form-grupo"><label for="mkt-responsavel">Responsável</label><input id="mkt-responsavel" class="campo-form" name="responsavel" maxlength="80" value="${esc(item?.responsavel||sessao.usuario?.nome||'')}" placeholder="Letícia ou Fernando"></div>
+      <div class="form-grupo"><label for="mkt-data-prevista">Data prevista</label><input id="mkt-data-prevista" class="campo-form" type="date" name="data_prevista" value="${esc(String(item?.data_prevista||'').slice(0,10))}"></div>
+      <div class="form-grupo"><label for="mkt-data-publicado">Data de publicação</label><input id="mkt-data-publicado" class="campo-form" type="date" name="data_publicado" value="${esc(String(item?.data_publicado||'').slice(0,10))}"></div>
+      <div class="form-grupo full"><label for="mkt-observacoes">Observações</label><textarea id="mkt-observacoes" class="campo-form textarea" name="observacoes" maxlength="2000">${esc(item?.observacoes||'')}</textarea></div>
+      <div class="form-grupo full"><div id="mkt-erro-form" class="mensagem"></div></div>
+      <div class="form-acoes full"><button type="button" class="botao-acao" data-fechar-modal>Cancelar</button><button type="submit" class="botao-acao destaque">${editar?'Salvar alterações':'Salvar conteúdo'}</button></div>
+    </form>`);
+  $('form-marketing').querySelector('[data-fechar-modal]').addEventListener('click',fecharModal);
+  $('form-marketing').addEventListener('submit',async event=>{
+    event.preventDefault();
+    const form=event.currentTarget, dados=Object.fromEntries(new FormData(form).entries());
+    const btn=form.querySelector('[type="submit"]'); btn.disabled=true; btn.textContent='Salvando...';
+    try {
+      const result=editar
+        ? await chamarApi({action:'atualizarMarketing',id_conteudo:item.id_conteudo,conteudo:dados})
+        : await chamarApi({action:'cadastrarMarketing',conteudo:dados});
+      fecharModal(); toast(result.dados?.mensagem||'Conteúdo salvo.'); await atualizarMarketingTela();
+    } catch(error) { $('mkt-erro-form').textContent=error.message||'Não foi possível salvar o conteúdo.'; btn.disabled=false; btn.textContent=editar?'Salvar alterações':'Salvar conteúdo'; }
+  });
+}
+async function alterarStatusMarketingTela(id,status) {
+  const item=marketingCache.find(x=>String(x.id_conteudo)===String(id)); if(!item)return;
+  const label=statusMarketingLabelUI(status);
+  if(!confirm(`Alterar “${item.titulo}” para “${label}”?`))return;
+  try { const r=await chamarApi({action:'alterarStatusMarketing',id_conteudo:id,status}); toast(r.dados?.mensagem||'Etapa atualizada.'); await atualizarMarketingTela(); }
+  catch(error) { toast(error.message||'Não foi possível alterar a etapa.'); }
 }
 
 
