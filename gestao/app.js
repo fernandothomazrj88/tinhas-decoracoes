@@ -1,6 +1,6 @@
 'use strict';
 
-const TINHAS_VERSION = (window.TINHAS_CONFIG && window.TINHAS_CONFIG.APP_VERSION) || '1.8.0';
+const TINHAS_VERSION = (window.TINHAS_CONFIG && window.TINHAS_CONFIG.APP_VERSION) || '1.9.0';
 const STORAGE_TOKEN = 'tinhas_gestao_token';
 const STORAGE_USER = 'tinhas_gestao_usuario';
 const STATUS_PRODUCAO = ['Aguardando material', 'Em produção', 'Acabamento', 'Pronto', 'Entregue', 'Cancelado'];
@@ -339,6 +339,7 @@ async function abrirModulo(nome) {
     else if (nome === 'agenda') await renderAgenda(area);
     else if (nome === 'portfolio') await renderPortfolio(area);
     else if (nome === 'marketing') await renderMarketing(area);
+    else if (nome === 'relatorios') await renderRelatorios(area);
     else if (nome === 'configuracoes') await renderConfiguracoes(area);
     else renderModuloEmPreparacao(area, nome);
   } catch (error) {
@@ -1499,6 +1500,127 @@ async function alterarStatusMarketingTela(id,status) {
   if(!confirm(`Alterar “${item.titulo}” para “${label}”?`))return;
   try { const r=await chamarApi({action:'alterarStatusMarketing',id_conteudo:id,status}); toast(r.dados?.mensagem||'Etapa atualizada.'); await atualizarMarketingTela(); }
   catch(error) { toast(error.message||'Não foi possível alterar a etapa.'); }
+}
+
+
+/* =====================================================
+   RELATÓRIOS — VISÃO CONSOLIDADA DA OPERAÇÃO
+   Consolida dados já existentes; não grava nem cria abas.
+===================================================== */
+let relatoriosDadosCache = null;
+
+async function renderRelatorios(area) {
+  const config = MODULOS.relatorios;
+  const mes = new Date().toISOString().slice(0,7);
+  area.innerHTML = cabecalhoModulo(config) + `
+    <section class="relatorios-topo">
+      <div><strong>Visão geral da Tinhas</strong><small>Indicadores consolidados dos módulos</small></div>
+      <div class="relatorios-controles"><input id="rel-periodo" class="campo-filtro" type="month" value="${mes}" aria-label="Mês do relatório"><button id="rel-atualizar" class="botao-acao">↻ Atualizar</button></div>
+    </section>
+    <div id="rel-status" class="status">Reunindo informações da empresa...</div>
+    <section class="relatorios-kpis">
+      <article class="rel-kpi receita"><small>Receitas recebidas</small><strong id="rel-receitas">—</strong><span id="rel-receitas-qtd">—</span></article>
+      <article class="rel-kpi despesa"><small>Despesas pagas</small><strong id="rel-despesas">—</strong><span id="rel-despesas-qtd">—</span></article>
+      <article class="rel-kpi resultado"><small>Resultado do mês</small><strong id="rel-resultado">—</strong><span>Receitas menos despesas pagas</span></article>
+      <article class="rel-kpi pedidos"><small>Pedidos ativos</small><strong id="rel-pedidos">—</strong><span id="rel-pedidos-entrega">—</span></article>
+    </section>
+    <section class="relatorios-duas-colunas">
+      <article class="rel-painel"><div class="rel-painel-titulo"><h3>Financeiro do período</h3><span id="rel-periodo-label"></span></div><div id="rel-grafico-financeiro" class="rel-barras"></div></article>
+      <article class="rel-painel"><div class="rel-painel-titulo"><h3>Produção por etapa</h3></div><div id="rel-producao-etapas" class="rel-lista-indicadores"></div></article>
+    </section>
+    <section class="relatorios-duas-colunas">
+      <article class="rel-painel"><div class="rel-painel-titulo"><h3>Atenção necessária</h3></div><div id="rel-alertas" class="rel-lista-indicadores"></div></article>
+      <article class="rel-painel"><div class="rel-painel-titulo"><h3>Visão dos outros módulos</h3></div><div id="rel-outros-modulos" class="rel-lista-indicadores"></div></article>
+    </section>
+    <div class="aviso-modulo relatorio-aviso"><strong>Como os números são calculados:</strong> os valores financeiros consideram apenas lançamentos marcados como pagos ou recebidos no mês escolhido. Os indicadores operacionais refletem os registros atuais. Este painel é somente de consulta e não altera dados.</div>`;
+  $('rel-atualizar').addEventListener('click', carregarRelatorios);
+  $('rel-periodo').addEventListener('change', renderizarRelatoriosDados);
+  await carregarRelatorios();
+}
+
+async function carregarRelatorios() {
+  const status = $('rel-status');
+  if (!status) return;
+  status.className = 'status'; status.textContent = 'Atualizando indicadores...';
+  $('rel-atualizar').disabled = true;
+  try {
+    const acoes = [
+      ['clientes','listarClientes','clientes'],
+      ['orcamentos','listarOrcamentos','orcamentos'],
+      ['pedidos','listarPedidos','pedidos'],
+      ['materiais','listarMateriais','materiais'],
+      ['movimentacoes','listarMovimentacoesEstoque','movimentacoes'],
+      ['lancamentos','listarLancamentosFinanceiros','lancamentos'],
+      ['tarefas','listarTarefas','tarefas'],
+      ['portfolio','listarPortfolio','portfolio'],
+      ['marketing','listarMarketing','conteudos']
+    ];
+    const resultados = await Promise.all(acoes.map(async ([chave,action,campoDados]) => {
+      const r = await chamarApi({action});
+      return [chave, (r.dados && r.dados[campoDados]) || []];
+    }));
+    relatoriosDadosCache = Object.fromEntries(resultados);
+    renderizarRelatoriosDados();
+    status.className = 'status ok';
+    status.textContent = 'Relatórios atualizados com os dados atuais da planilha.';
+  } catch (error) {
+    status.className = 'status error';
+    status.textContent = 'Não foi possível carregar todos os indicadores: ' + (error.message || 'Erro desconhecido');
+  } finally { $('rel-atualizar').disabled = false; }
+}
+
+function renderizarRelatoriosDados() {
+  if (!relatoriosDadosCache) return;
+  const d = relatoriosDadosCache;
+  const mes = $('rel-periodo')?.value || new Date().toISOString().slice(0,7);
+  const dentroMes = v => String(v || '').slice(0,7) === mes;
+  const num = v => { if (typeof v === 'number') return Number.isFinite(v) ? v : 0; const raw = String(v ?? 0).trim(); const normal = raw.includes(',') ? raw.replace(/\./g,'').replace(',','.') : raw; const n = Number(normal); return Number.isFinite(n) ? n : 0; };
+  const statusNorm = v => normalizarTexto(v).replace(/[^a-z0-9]+/g,'_');
+  const lancMes = (d.lancamentos || []).filter(x => dentroMes(x.data));
+  const quitado = x => ['pago','paga','recebido','recebida','concluido','concluida','quitado','quitada'].includes(statusNorm(x.status));
+  const receitas = lancMes.filter(x => statusNorm(x.tipo).includes('receita') && quitado(x));
+  const despesas = lancMes.filter(x => statusNorm(x.tipo).includes('despesa') && quitado(x));
+  const totalRec = receitas.reduce((s,x)=>s+num(x.valor),0);
+  const totalDesp = despesas.reduce((s,x)=>s+num(x.valor),0);
+  const resultado = totalRec-totalDesp;
+  const pedidos = d.pedidos || [];
+  const ativos = pedidos.filter(x => !['entregue','cancelado'].includes(statusNorm(x.status)));
+  const entregues = pedidos.filter(x => statusNorm(x.status)==='entregue').length;
+  $('rel-receitas').textContent = moeda(totalRec);
+  $('rel-despesas').textContent = moeda(totalDesp);
+  $('rel-resultado').textContent = moeda(resultado);
+  $('rel-resultado').classList.toggle('negativo',resultado<0);
+  $('rel-receitas-qtd').textContent = `${receitas.length} recebimento(s)`;
+  $('rel-despesas-qtd').textContent = `${despesas.length} pagamento(s)`;
+  $('rel-pedidos').textContent = ativos.length;
+  $('rel-pedidos-entrega').textContent = `${entregues} entregue(s) no total`;
+  $('rel-periodo-label').textContent = mes ? mes.split('-').reverse().join('/') : '—';
+  const max = Math.max(totalRec,totalDesp,1);
+  $('rel-grafico-financeiro').innerHTML = [
+    ['Receitas',totalRec,'receita'],['Despesas',totalDesp,'despesa']
+  ].map(([label,val,classe])=>`<div class="rel-barra-item"><div><span>${label}</span><strong>${moeda(val)}</strong></div><div class="rel-barra-trilho"><i class="${classe}" style="width:${Math.max(val?2:0,Math.round(val/max*100))}%"></i></div></div>`).join('');
+  const etapas = [...new Set(pedidos.map(x=>String(x.status||'Sem status')))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+  $('rel-producao-etapas').innerHTML = etapas.length ? etapas.map(s=>`<div class="rel-linha"><span>${esc(s)}</span><strong>${pedidos.filter(x=>String(x.status||'Sem status')===s).length}</strong></div>`).join('') : '<div class="vazio">Nenhum pedido cadastrado.</div>';
+  const tarefas = d.tarefas || [];
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  const atrasadas = tarefas.filter(x=>x.data_limite && new Date(String(x.data_limite).slice(0,10)+'T00:00:00')<hoje && !['concluida','concluido','cancelada','cancelado'].includes(statusNorm(x.status)));
+  const estoqueBaixo = (d.materiais||[]).filter(x=>num(x.estoque_atual)<=num(x.estoque_minimo) && statusNorm(x.ativo)!=='false');
+  const pendentes = tarefas.filter(x=>!['concluida','concluido','cancelada','cancelado'].includes(statusNorm(x.status)));
+  const alertas = [
+    ['Tarefas atrasadas',atrasadas.length,'alerta'],
+    ['Materiais no mínimo ou abaixo',estoqueBaixo.length,'alerta'],
+    ['Tarefas em aberto',pendentes.length,'']
+  ];
+  $('rel-alertas').innerHTML = alertas.map(([l,v,c])=>`<div class="rel-linha ${c}"><span>${l}</span><strong>${v}</strong></div>`).join('');
+  const outros = [
+    ['Clientes cadastrados',(d.clientes||[]).length],
+    ['Orçamentos registrados',(d.orcamentos||[]).length],
+    ['Materiais cadastrados',(d.materiais||[]).length],
+    ['Movimentações de estoque',(d.movimentacoes||[]).length],
+    ['Projetos no Portfólio',(d.portfolio||[]).length],
+    ['Conteúdos de Marketing',(d.conteudos||[]).length]
+  ];
+  $('rel-outros-modulos').innerHTML = outros.map(([l,v])=>`<div class="rel-linha"><span>${l}</span><strong>${v}</strong></div>`).join('');
 }
 
 
